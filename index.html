@@ -141,9 +141,15 @@
         copyButton.addEventListener('click', () => {
             const yyyymmdd = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
             const content = diary.value.replace(/\n/g, '\n  ');
-            const entryMd = `---\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
+            const entryMd = `\n---\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
             navigator.clipboard.writeText(entryMd)
-                .then(() => alert('entry.md形式でクリップボードにコピーしました'))
+                .then(() => {
+                    const originalText = copyButton.textContent;
+                    copyButton.textContent = 'コピーしました';
+                    setTimeout(() => {
+                        copyButton.textContent = originalText;
+                    }, 3000);
+                })
                 .catch(err => console.error('クリップボードへのコピーに失敗:', err));
         });
 
