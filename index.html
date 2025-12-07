@@ -17,12 +17,20 @@
             margin: 0;
             padding: 0;
         }
-        .diary-box {
+        .diary-container {
             width: 800px;
             height: 950px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .diary-box {
+            width: 100%;
+            height: 850px;
             border-radius: 0;
-            padding: 20px;
+            padding: 0;
             box-sizing: border-box;
+            margin-bottom: 10px;
         }
         textarea {
             width: 100%;
@@ -34,7 +42,7 @@
             font-size: 16px;
             line-height: 1.5;
             padding: 34px;
-            border-radius:20px;
+            border-radius: 20px;
             box-sizing: border-box;
             font-family: inherit;
             font-size: 1.5em;
@@ -42,42 +50,72 @@
         textarea:focus {
             outline: none;
         }
-        .send-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
+        .button-container {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .send-button, .copy-button {
             background-color: #333;
             color: #aaa;
             border: none;
             border-radius: 3px;
-            padding: 5px 10px;
+            padding: 8px 16px;
             font-size: 12px;
             cursor: pointer;
             opacity: 0.7;
         }
-        .send-button:hover {
+        .send-button:hover, .copy-button:hover {
             opacity: 1;
         }
     </style>
 </head>
 <body>
-    <div class="diary-box">
-        <textarea id="diary" autofocus></textarea>
+    <div class="diary-container">
+        <div class="diary-box">
+            <textarea id="diary" autofocus></textarea>
+        </div>
+        <div class="button-container">
+            <button class="copy-button" id="copyButton">entry.md形式でコピー</button>
+            <button class="send-button" id="sendButton">Le Chatに送信</button>
+        </div>
     </div>
-    <button class="send-button" id="sendButton">Le Chatに送信</button>
-
     <script>
         const diary = document.getElementById('diary');
         const sendButton = document.getElementById('sendButton');
+        const copyButton = document.getElementById('copyButton');
 
         // 今日の日付を取得
         const today = new Date();
         const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
+        const month = today.getMonth() + 1;
+        const day = today.getDate();
         const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][today.getDay()];
-        const dateKey = `${year}-${month}-${day}`;
-        const datePlaceholder = `${year}年${month}月${day}日 ${dayOfWeek}曜日`;
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        // 漢数字に変換
+        function toKanjiNumber(num) {
+            const kanjiNumbers = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+            return num.toString().split('').map(d => kanjiNumbers[parseInt(d, 10)]).join('');
+        }
+
+        function toKanjiMonth(month) {
+            return ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'][month - 1];
+        }
+
+        function toKanjiDay(day) {
+            if ([10, 20, 30].includes(day)) return {10:'十日', 20:'二十日', 30:'三十日'}[day];
+            if (day === 31) return '三十一日';
+            if (day < 10) return toKanjiNumber(day) + '日';
+            if (day < 20) return '十' + toKanjiNumber(day - 10) + '日';
+            if (day < 30) return '二十' + toKanjiNumber(day - 20) + '日';
+            return toKanjiNumber(day) + '日';
+        }
+
+        const formattedDate = toKanjiMonth(month) + toKanjiDay(day) + `（${dayOfWeek}）`;
+        const datePlaceholder = formattedDate;
 
         // プレイスホルダーを設定
         diary.placeholder = datePlaceholder;
@@ -91,15 +129,22 @@
         // フォーカスが外れたらLocalStorageに保存
         diary.addEventListener('blur', () => {
             localStorage.setItem(dateKey, diary.value);
-            navigator.clipboard.writeText(diary.value)
-                .then(() => console.log('クリップボードにコピーしました'))
-                .catch(err => console.error('クリップボードへのコピーに失敗:', err));
         });
 
         // ボタンクリックでMistral AIに送信
         sendButton.addEventListener('click', () => {
             const encodedText = encodeURIComponent(diary.value);
             window.open(`https://chat.mistral.ai/chat?q=${encodedText}`, '_blank');
+        });
+
+        // entry.md形式でコピー
+        copyButton.addEventListener('click', () => {
+            const yyyymmdd = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+            const content = diary.value.replace(/\n/g, '\n  ');
+            const entryMd = `---\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
+            navigator.clipboard.writeText(entryMd)
+                .then(() => alert('entry.md形式でクリップボードにコピーしました'))
+                .catch(err => console.error('クリップボードへのコピーに失敗:', err));
         });
 
         // ページロード時にtextareaにフォーカス
