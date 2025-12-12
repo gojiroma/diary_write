@@ -237,28 +237,37 @@
         });
 
         // entry.md形式でコピー
-        function copyToClipboard() {
-            const yyyymmdd = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
-            const title = titleInput.value.trim();
-            const content = diary.value.replace(/\n/g, '\n  ');
+    function copyToClipboard() {
+        const yyyymmdd = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+        const title = titleInput.value.trim();
+        const content = diary.value.replace(/\n/g, '\n  ');
 
-            let entryMd;
-            if (title) {
-                entryMd = `\n---\ntitle: ${title}\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
-            } else {
-                entryMd = `\n---\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
-            }
-
-            navigator.clipboard.writeText(entryMd)
-                .then(() => {
-                    const originalText = copyButton.textContent;
-                    copyButton.textContent = 'コピーしました';
-                    setTimeout(() => {
-                        copyButton.textContent = originalText;
-                    }, 3000);
-                })
-                .catch(err => console.error('クリップボードへのコピーに失敗:', err));
+        let entryMd;
+        if (title) {
+            entryMd = `\n---\ntitle: ${title}\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
+        } else {
+            entryMd = `\n---\ndate: ${yyyymmdd}\ncontent: |\n  ${content}\n---`;
         }
+
+        navigator.clipboard.writeText(entryMd)
+            .then(() => {
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'コピーしました';
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                }, 3000);
+
+                // 追加: GitHubの編集ページを開く
+                if (diary.value.trim() !== "") {
+                    if (title) {
+                        window.open('https://github.com/gojiroma/monogoto/edit/main/entry.md', '_blank');
+                    } else {
+                        window.open('https://github.com/gojiroma/diary/edit/main/entry.md', '_blank');
+                    }
+                }
+            })
+            .catch(err => console.error('クリップボードへのコピーに失敗:', err));
+    }
 
         copyButton.addEventListener('click', copyToClipboard);
 
