@@ -61,7 +61,6 @@
             box-sizing: border-box;
             margin-bottom: 10px;
             overflow: hidden;
-            /* Ensure content doesn't spill out */
         }
 
         textarea {
@@ -132,7 +131,8 @@
             <textarea id="diary"></textarea>
         </div>
         <div class="button-container">
-            <button class="copy-button" id="copyButton">entry.md形式でコピー</button>
+            <button class="copy-button" id="copyDiaryButton">日記</button>
+            <button class="copy-button" id="copyFakeDiaryButton">嘘日記</button>
             <button class="send-button" id="sendButton">Le Chatに送信</button>
         </div>
     </div>
@@ -140,7 +140,8 @@
         const titleInput = document.getElementById('title');
         const diary = document.getElementById('diary');
         const sendButton = document.getElementById('sendButton');
-        const copyButton = document.getElementById('copyButton');
+        const copyDiaryButton = document.getElementById('copyDiaryButton');
+        const copyFakeDiaryButton = document.getElementById('copyFakeDiaryButton');
         const titleBox = document.querySelector('.title-box');
         const buttonContainer = document.querySelector('.button-container');
 
@@ -193,7 +194,7 @@
             if (e.key === 'Tab') {
                 e.preventDefault();
                 if (diary.value.trim() !== "") {
-                    copyToClipboard();
+                    copyToClipboard('diary');
                 } else {
                     handleDiaryBlur();
                 }
@@ -251,7 +252,7 @@
         });
 
         // entry.md形式でコピー
-        function copyToClipboard() {
+        function copyToClipboard(type) {
             const yyyymmdd = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
             const title = titleInput.value.trim();
             const content = diary.value.replace(/\n/g, '\n  ');
@@ -265,25 +266,27 @@
 
             navigator.clipboard.writeText(entryMd)
                 .then(() => {
-                    const originalText = copyButton.textContent;
-                    copyButton.textContent = 'コピーしました';
+                    const originalText = type === 'diary' ? copyDiaryButton.textContent : copyFakeDiaryButton.textContent;
+                    const button = type === 'diary' ? copyDiaryButton : copyFakeDiaryButton;
+                    button.textContent = 'コピーしました';
                     setTimeout(() => {
-                        copyButton.textContent = originalText;
+                        button.textContent = originalText;
                     }, 3000);
 
-                    // 追加: GitHubの編集ページを開く
+                    // GitHubの編集ページを開く
                     if (diary.value.trim() !== "") {
-                        if (title) {
-                            window.open('https://github.com/gojiroma/monogoto/edit/main/entry.md', '_blank');
-                        } else {
+                        if (type === 'diary') {
                             window.open('https://github.com/gojiroma/diary/edit/main/entry.md', '_blank');
+                        } else {
+                            window.open('https://github.com/gojiroma/diary/edit/main/fake.md', '_blank');
                         }
                     }
                 })
                 .catch(err => console.error('クリップボードへのコピーに失敗:', err));
         }
 
-        copyButton.addEventListener('click', copyToClipboard);
+        copyDiaryButton.addEventListener('click', () => copyToClipboard('diary'));
+        copyFakeDiaryButton.addEventListener('click', () => copyToClipboard('fake'));
 
         // ページロード時にUIを更新
         window.addEventListener('load', () => {
