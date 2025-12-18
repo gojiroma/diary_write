@@ -34,7 +34,6 @@
         .title-box {
             width: 100%;
             margin-bottom: 10px;
-            display: none;
         }
 
         .title-box input {
@@ -90,7 +89,6 @@
             justify-content: flex-end;
             gap: 10px;
             margin-top: 10px;
-            display: none;
         }
 
         .send-button,
@@ -133,6 +131,7 @@
         <div class="button-container">
             <button class="copy-button" id="copyDiaryButton">日記</button>
             <button class="copy-button" id="copyFakeDiaryButton">嘘日記</button>
+            <button class="copy-button" id="copyMonogotoButton">物事</button>
             <button class="send-button" id="sendButton">Le Chatに送信</button>
         </div>
     </div>
@@ -142,6 +141,7 @@
         const sendButton = document.getElementById('sendButton');
         const copyDiaryButton = document.getElementById('copyDiaryButton');
         const copyFakeDiaryButton = document.getElementById('copyFakeDiaryButton');
+        const copyMonogotoButton = document.getElementById('copyMonogotoButton');
         const titleBox = document.querySelector('.title-box');
         const buttonContainer = document.querySelector('.button-container');
 
@@ -174,16 +174,22 @@
         const formattedDate = toKanjiMonth(month) + toKanjiDay(day);
         const datePlaceholder = formattedDate;
 
-        // プレイスホルダーを設定
-        diary.placeholder = datePlaceholder;
-
         // LocalStorageから読み込み（今日分のみ）
         const savedTitle = localStorage.getItem(`${dateKey}-title`);
         const savedContent = localStorage.getItem(dateKey);
+
+        // タイトルがLocalStorageにある場合、title-boxを表示
         if (savedTitle) {
             titleInput.value = savedTitle;
+            titleBox.style.display = 'block';
+            diary.style.writingMode = 'horizontal-tb';
             diary.placeholder = "";
+        } else {
+            titleBox.style.display = 'none';
+            diary.style.writingMode = 'vertical-rl';
+            diary.placeholder = datePlaceholder;
         }
+
         if (savedContent) {
             diary.value = savedContent;
         }
@@ -266,8 +272,12 @@
 
             navigator.clipboard.writeText(entryMd)
                 .then(() => {
-                    const originalText = type === 'diary' ? copyDiaryButton.textContent : copyFakeDiaryButton.textContent;
-                    const button = type === 'diary' ? copyDiaryButton : copyFakeDiaryButton;
+                    const originalText = type === 'diary' ? copyDiaryButton.textContent :
+                        type === 'fake' ? copyFakeDiaryButton.textContent :
+                            copyMonogotoButton.textContent;
+                    const button = type === 'diary' ? copyDiaryButton :
+                        type === 'fake' ? copyFakeDiaryButton :
+                            copyMonogotoButton;
                     button.textContent = 'コピーしました';
                     setTimeout(() => {
                         button.textContent = originalText;
@@ -277,8 +287,10 @@
                     if (diary.value.trim() !== "") {
                         if (type === 'diary') {
                             window.open('https://github.com/gojiroma/diary/edit/main/entry.md', '_blank');
-                        } else {
+                        } else if (type === 'fake') {
                             window.open('https://github.com/gojiroma/diary/edit/main/fake.md', '_blank');
+                        } else if (type === 'monogoto') {
+                            window.open('https://github.com/gojiroma/monogoto/edit/main/entry.md', '_blank');
                         }
                     }
                 })
@@ -287,6 +299,7 @@
 
         copyDiaryButton.addEventListener('click', () => copyToClipboard('diary'));
         copyFakeDiaryButton.addEventListener('click', () => copyToClipboard('fake'));
+        copyMonogotoButton.addEventListener('click', () => copyToClipboard('monogoto'));
 
         // ページロード時にUIを更新
         window.addEventListener('load', () => {
