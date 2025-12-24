@@ -301,12 +301,44 @@
         copyFakeDiaryButton.addEventListener('click', () => copyToClipboard('fake'));
         copyMonogotoButton.addEventListener('click', () => copyToClipboard('monogoto'));
 
+        // ウィンドウがアクティブになったときの処理
+        window.addEventListener('focus', () => {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const formattedDate = toKanjiMonth(month) + toKanjiDay(day);
+
+            // 日付が変わっていたらLocalStorageの内容をクリア
+            const lastDateKey = localStorage.getItem('lastDateKey');
+            if (lastDateKey !== dateKey) {
+                localStorage.removeItem(`${lastDateKey}-title`);
+                localStorage.removeItem(lastDateKey);
+                localStorage.setItem('lastDateKey', dateKey);
+
+                // UIをリセット
+                titleInput.value = '';
+                diary.value = '';
+                titleBox.style.display = 'none';
+                diary.style.writingMode = 'vertical-rl';
+                diary.placeholder = formattedDate;
+                updateUI();
+            }
+        });
+
         // ページロード時にUIを更新
         window.addEventListener('load', () => {
             updateUI();
             diary.focus();
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            localStorage.setItem('lastDateKey', dateKey);
         });
     </script>
 </body>
 
-</html>
+</html
