@@ -95,8 +95,31 @@
         }
 
         .date-text {
-            writing-mode: vertical-l;
+            writing-mode: vertical-rl;
             text-orientation: upright;
+        }
+
+        /* トースト通知スタイル */
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 10px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            right: 30px;
+            top: 30px;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
         }
 
         @media (max-width: 600px) {
@@ -140,7 +163,22 @@
             </div>
         </div>
     </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="toast"></div>
+
     <script>
+        // トースト通知を表示する関数
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.backgroundColor = isError ? '#ff4444' : '#4CAF50';
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
         // 日付フォーマット関数
         const formatDateKey = (date) => {
             const year = date.getFullYear();
@@ -198,60 +236,53 @@
         // 日付を表示
         dateDisplay.textContent = formatJapaneseDate(currentDate);
 
-        // LocalStorageから読み込み
-        const savedRealContent = localStorage.getItem(`${currentDateKey}-real`);
-        const savedFakeContent = localStorage.getItem(`${currentDateKey}-fake`);
-
-        if (savedRealContent) realDiary.value = savedRealContent;
-        if (savedFakeContent) fakeDiary.value = savedFakeContent;
-
         // GitHubからファイルを取得する関数
-        async function fetchGitHubFile(url, token) {
+        async function fetchGitHubFile(fileName, token) {
             try {
-                const response = await fetch(url, {
+                const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
+                const response = await fetch(apiUrl, {
                     headers: {
                         'Authorization': `token ${token}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
                 if (!response.ok) throw new Error('ファイルの取得に失敗しました');
-                return await response.text();
+                const fileData = await response.json();
+                const contentResponse = await fetch(fileData.download_url);
+                return await contentResponse.text();
             } catch (error) {
                 console.error('GitHubからのファイル取得エラー:', error);
                 return null;
             }
         }
 
-        // GitHubからエントリを取得して指定日のエントリを表示
+        // 指定日のエントリを抽出
+        function extractEntry(content, dateKey) {
+            if (!content) return null;
+            const dateRegex = new RegExp(`date: ${dateKey}[\\s\\S]*?content: \\|([\\s\\S]*?)(?=---|$)`);
+            const match = content.match(dateRegex);
+            return match ? match[1].trim().replace(/^\s{2}/gm, '') : null;
+        }
+
+        // 指定日のエントリを読み込む
         async function loadEntriesForDate(date) {
             const dateKey = formatDateKey(date);
             const dateKeyNoHyphen = dateKey.replace(/-/g, '');
             const token = localStorage.getItem('githubToken');
             if (!token) return;
 
-            const diaryUrl = `https://api.github.com/repos/gojiroma/diary/contents/entry.md`;
-            const fakeUrl = `https://api.github.com/repos/gojiroma/diary/contents/fake.md`;
+            try {
+                const diaryContent = await fetchGitHubFile('entry.md', token);
+                const fakeContent = await fetchGitHubFile('fake.md', token);
 
-            const diaryResponse = await fetchGitHubFile(diaryUrl, token);
-            const fakeResponse = await fetchGitHubFile(fakeUrl, token);
-
-            if (diaryResponse) {
-                const diaryContent = await fetch(diaryResponse.download_url).then(res => res.text());
-                const entry = extractEntry(diaryContent, dateKeyNoHyphen);
-                if (entry) realDiary.value = entry;
-            }
-            if (fakeResponse) {
-                const fakeContent = await fetch(fakeResponse.download_url).then(res => res.text());
+                const diaryEntry = extractEntry(diaryContent, dateKeyNoHyphen);
                 const fakeEntry = extractEntry(fakeContent, dateKeyNoHyphen);
-                if (fakeEntry) fakeDiary.value = fakeEntry;
-            }
-        }
 
-        // 指定日のエントリを抽出
-        function extractEntry(content, dateKey) {
-            const dateRegex = new RegExp(`date: ${dateKey}`);
-            const match = content.match(new RegExp(`---\\ndate: ${dateKey}.*?content: \\|(.*?)---`, 's'));
-            return match ? match[1].trim().replace(/^\s{2}/gm, '') : null;
+                realDiary.value = diaryEntry || '';
+                fakeDiary.value = fakeEntry || '';
+            } catch (error) {
+                console.error('エントリ読み込みエラー:', error);
+            }
         }
 
         // 日付を1日戻す
@@ -282,26 +313,27 @@
             }
 
             if (!realDiary.value.trim() && !fakeDiary.value.trim()) {
-                alert('本文が空です。');
+                showToast('本文が空です。', true);
                 return;
             }
 
-            let success = true;
-            if (realDiary.value.trim()) {
-                const result = await appendToGitHub('entry.md', realDiary.value, currentDateKeyNoHyphen, token);
-                if (!result) success = false;
-            }
-            if (fakeDiary.value.trim()) {
-                const result = await appendToGitHub('fake.md', fakeDiary.value, currentDateKeyNoHyphen, token);
-                if (!result) success = false;
-            }
+            try {
+                let success = true;
+                if (realDiary.value.trim()) {
+                    const result = await appendToGitHub('entry.md', realDiary.value, currentDateKeyNoHyphen, token);
+                    if (!result) success = false;
+                }
+                if (fakeDiary.value.trim()) {
+                    const result = await appendToGitHub('fake.md', fakeDiary.value, currentDateKeyNoHyphen, token);
+                    if (!result) success = false;
+                }
 
-            if (success) {
-                alert('GitHubに追記しました。');
-                realDiary.value = '';
-                fakeDiary.value = '';
-                localStorage.removeItem(`${currentDateKey}-real`);
-                localStorage.removeItem(`${currentDateKey}-fake`);
+                if (success) {
+                    showToast('GitHubに追記しました。');
+                }
+            } catch (error) {
+                console.error('送信エラー:', error);
+                showToast('送信に失敗しました。', true);
             }
         });
 
@@ -320,7 +352,7 @@
             });
 
             if (!fileResponse.ok) {
-                alert('ファイルの取得に失敗しました。Tokenの権限を確認してください。');
+                showToast('ファイルの取得に失敗しました。Tokenの権限を確認してください。', true);
                 return false;
             }
 
@@ -349,21 +381,21 @@
                 },
                 body: JSON.stringify({
                     message: message,
-                    content: btoa(newContent),
+                    content: btoa(unescape(encodeURIComponent(newContent))),
                     sha: sha,
                     branch: branch
                 })
             });
 
             if (!updateResponse.ok) {
-                alert('GitHubへの更新に失敗しました。Tokenの権限を確認してください。');
+                showToast('GitHubへの更新に失敗しました。Tokenの権限を確認してください。', true);
                 return false;
             }
 
             return true;
         }
 
-        // ページロード時にGitHub Personal Access Tokenを確認
+        // ページロード時の初期化
         window.addEventListener('load', () => {
             if (!localStorage.getItem('githubToken')) {
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
@@ -372,15 +404,6 @@
                 }
             }
             loadEntriesForDate(currentDate);
-        });
-
-        // LocalStorageに自動保存
-        realDiary.addEventListener('input', () => {
-            localStorage.setItem(`${currentDateKey}-real`, realDiary.value);
-        });
-
-        fakeDiary.addEventListener('input', () => {
-            localStorage.setItem(`${currentDateKey}-fake`, fakeDiary.value);
         });
     </script>
 </body>
