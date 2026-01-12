@@ -303,7 +303,7 @@
             loadEntriesForDate(currentDate);
         });
 
-        // 日付クリック時の処理（GitHubに追記）
+        // 日付クリック時の処理（GitHubに更新）
         dateDisplay.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
             if (!token) {
@@ -320,16 +320,16 @@
             try {
                 let success = true;
                 if (realDiary.value.trim()) {
-                    const result = await appendToGitHub('entry.md', realDiary.value, currentDateKeyNoHyphen, token);
+                    const result = await updateGitHubFile('entry.md', realDiary.value, currentDateKeyNoHyphen, token);
                     if (!result) success = false;
                 }
                 if (fakeDiary.value.trim()) {
-                    const result = await appendToGitHub('fake.md', fakeDiary.value, currentDateKeyNoHyphen, token);
+                    const result = await updateGitHubFile('fake.md', fakeDiary.value, currentDateKeyNoHyphen, token);
                     if (!result) success = false;
                 }
 
                 if (success) {
-                    showToast('GitHubに追記しました。');
+                    showToast('GitHubに更新しました。');
                 }
             } catch (error) {
                 console.error('送信エラー:', error);
@@ -337,10 +337,10 @@
             }
         });
 
-        // GitHubにエントリを追記する関数
-        async function appendToGitHub(fileName, content, dateKeyNoHyphen, token) {
+        // GitHubのファイルを更新する関数（上書きまたは追記）
+        async function updateGitHubFile(fileName, content, dateKeyNoHyphen, token) {
             const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
-            const message = `Add entry for ${dateKeyNoHyphen}`;
+            const message = `Update entry for ${dateKeyNoHyphen}`;
             const branch = 'main';
 
             // ファイルのSHAを取得
@@ -366,10 +366,19 @@
                 existingContent = await existingContentResponse.text();
             }
 
-            // 新しいエントリを作成
-            const newEntry = `\n---\ndate: ${dateKeyNoHyphen}\ncontent: |\n  ${content.replace(/\n/g, '\n  ')}\n---`;
-
-            const newContent = existingContent + newEntry;
+            // 既存のエントリを検索
+            const entryRegex = new RegExp(`date: ${dateKeyNoHyphen}[\\s\\S]*?(?=---|$)`);
+            let newContent;
+            if (entryRegex.test(existingContent)) {
+                // 既存のエントリを上書き
+                newContent = existingContent.replace(
+                    entryRegex,
+                    `date: ${dateKeyNoHyphen}\ncontent: |\n  ${content.replace(/\n/g, '\n  ')}\n---`
+                );
+            } else {
+                // 新しいエントリを追記
+                newContent = existingContent + `\n---\ndate: ${dateKeyNoHyphen}\ncontent: |\n  ${content.replace(/\n/g, '\n  ')}\n---`;
+            }
 
             // ファイルを更新
             const updateResponse = await fetch(apiUrl, {
