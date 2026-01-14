@@ -303,6 +303,115 @@
             loadEntriesForDate(currentDate);
         });
 
+        // 2ファイルを1コミットで更新する関数
+        async function updateMultipleFiles(token, dateKeyNoHyphen, realContent, fakeContent) {
+            const repoOwner = 'gojiroma';
+            const repoName = 'diary';
+            const branch = 'main';
+            const baseUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
+
+            // 1. リポジトリの最新のコミットSHAを取得
+            const refResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (!refResponse.ok) {
+                showToast('ブランチの取得に失敗しました。', true);
+                return false;
+            }
+            const refData = await refResponse.json();
+            const latestCommitSha = refData.object.sha;
+
+            // 2. 最新のコミットのTree SHAを取得
+            const commitResponse = await fetch(`${baseUrl}/git/commits/${latestCommitSha}`, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (!commitResponse.ok) {
+                showToast('コミットの取得に失敗しました。', true);
+                return false;
+            }
+            const commitData = await commitResponse.json();
+            const latestTreeSha = commitData.tree.sha;
+
+            // 3. 新しいTreeを作成
+            const treeResponse = await fetch(`${baseUrl}/git/trees`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    base_tree: latestTreeSha,
+                    tree: [
+                        {
+                            path: 'entry.md',
+                            mode: '100644',
+                            type: 'blob',
+                            content: realContent
+                        },
+                        {
+                            path: 'fake.md',
+                            mode: '100644',
+                            type: 'blob',
+                            content: fakeContent
+                        }
+                    ]
+                })
+            });
+            if (!treeResponse.ok) {
+                showToast('Treeの作成に失敗しました。', true);
+                return false;
+            }
+            const treeData = await treeResponse.json();
+            const newTreeSha = treeData.sha;
+
+            // 4. 新しいコミットを作成
+            const newCommitResponse = await fetch(`${baseUrl}/git/commits`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Update entries for ${dateKeyNoHyphen}`,
+                    tree: newTreeSha,
+                    parents: [latestCommitSha]
+                })
+            });
+            if (!newCommitResponse.ok) {
+                showToast('コミットの作成に失敗しました。', true);
+                return false;
+            }
+            const newCommitData = await newCommitResponse.json();
+            const newCommitSha = newCommitData.sha;
+
+            // 5. ブランチの参照を更新
+            const updateRefResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sha: newCommitSha
+                })
+            });
+            if (!updateRefResponse.ok) {
+                showToast('ブランチの更新に失敗しました。', true);
+                return false;
+            }
+
+            return true;
+        }
+
         // 日付クリック時の処理（GitHubに更新）
         dateDisplay.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
@@ -318,16 +427,39 @@
             }
 
             try {
-                let success = true;
+                // 既存のコンテンツを取得
+                const existingEntryContent = await fetchGitHubFile('entry.md', token);
+                const existingFakeContent = await fetchGitHubFile('fake.md', token);
+
+                // 既存のエントリを検索
+                const entryRegex = new RegExp(`date: ${currentDateKeyNoHyphen}[\\s\\S]*?(?=---|$)`);
+                let newEntryContent = existingEntryContent || '';
+                let newFakeContent = existingFakeContent || '';
+
                 if (realDiary.value.trim()) {
-                    const result = await updateGitHubFile('entry.md', realDiary.value, currentDateKeyNoHyphen, token);
-                    if (!result) success = false;
-                }
-                if (fakeDiary.value.trim()) {
-                    const result = await updateGitHubFile('fake.md', fakeDiary.value, currentDateKeyNoHyphen, token);
-                    if (!result) success = false;
+                    if (entryRegex.test(newEntryContent)) {
+                        newEntryContent = newEntryContent.replace(
+                            entryRegex,
+                            `date: ${currentDateKeyNoHyphen}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`
+                        );
+                    } else {
+                        newEntryContent += `\n---\ndate: ${currentDateKeyNoHyphen}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                    }
                 }
 
+                if (fakeDiary.value.trim()) {
+                    if (entryRegex.test(newFakeContent)) {
+                        newFakeContent = newFakeContent.replace(
+                            entryRegex,
+                            `date: ${currentDateKeyNoHyphen}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`
+                        );
+                    } else {
+                        newFakeContent += `\n---\ndate: ${currentDateKeyNoHyphen}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                    }
+                }
+
+                // 1回のコミットで更新
+                const success = await updateMultipleFiles(token, currentDateKeyNoHyphen, newEntryContent, newFakeContent);
                 if (success) {
                     showToast('GitHubに更新しました。');
                 }
@@ -336,73 +468,6 @@
                 showToast('送信に失敗しました。', true);
             }
         });
-
-        // GitHubのファイルを更新する関数（上書きまたは追記）
-        async function updateGitHubFile(fileName, content, dateKeyNoHyphen, token) {
-            const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
-            const message = `Update entry for ${dateKeyNoHyphen}`;
-            const branch = 'main';
-
-            // ファイルのSHAを取得
-            const fileResponse = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-
-            if (!fileResponse.ok) {
-                showToast('ファイルの取得に失敗しました。Tokenの権限を確認してください。', true);
-                return false;
-            }
-
-            const fileData = await fileResponse.json();
-            const sha = fileData.sha;
-
-            // 既存のコンテンツを取得
-            const existingContentResponse = await fetch(fileData.download_url);
-            let existingContent = '';
-            if (existingContentResponse.ok) {
-                existingContent = await existingContentResponse.text();
-            }
-
-            // 既存のエントリを検索
-            const entryRegex = new RegExp(`date: ${dateKeyNoHyphen}[\\s\\S]*?(?=---|$)`);
-            let newContent;
-            if (entryRegex.test(existingContent)) {
-                // 既存のエントリを上書き
-                newContent = existingContent.replace(
-                    entryRegex,
-                    `date: ${dateKeyNoHyphen}\ncontent: |\n  ${content.replace(/\n/g, '\n  ')}\n---`
-                );
-            } else {
-                // 新しいエントリを追記
-                newContent = existingContent + `\n---\ndate: ${dateKeyNoHyphen}\ncontent: |\n  ${content.replace(/\n/g, '\n  ')}\n---`;
-            }
-
-            // ファイルを更新
-            const updateResponse = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: message,
-                    content: btoa(unescape(encodeURIComponent(newContent))),
-                    sha: sha,
-                    branch: branch
-                })
-            });
-
-            if (!updateResponse.ok) {
-                showToast('GitHubへの更新に失敗しました。Tokenの権限を確認してください。', true);
-                return false;
-            }
-
-            return true;
-        }
 
         // ページロード時の初期化
         window.addEventListener('load', () => {
