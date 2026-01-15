@@ -23,6 +23,7 @@
             height: 100vh;
             margin: 0;
             padding: 0;
+            position: relative;
         }
 
         .diary-container {
@@ -122,6 +123,31 @@
             opacity: 1;
         }
 
+        /* リンクコンテナ */
+        .link-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        /* リンクスタイル */
+        .subtle-link {
+            font-size: 0.8em;
+            color: #aaa;
+            opacity: 0.5;
+            text-decoration: none;
+            transition: opacity 0.3s;
+        }
+
+        .subtle-link:hover {
+            opacity: 1;
+            color: #ffe4da;
+        }
+
         @media (max-width: 600px) {
             .diary-boxes {
                 flex-direction: column;
@@ -164,9 +190,18 @@
         </div>
     </div>
 
+    <!-- リンクコンテナ -->
+    <div class="link-container">
+        <a href="https://github.com/gojiroma/diary" class="subtle-link" target="_blank" rel="noopener noreferrer">
+            日記のrepo
+        </a>
+        <a href="https://nikki.poet.blue" class="subtle-link" target="_blank" rel="noopener noreferrer">
+            日記prod
+        </a>
+    </div>
+
     <!-- トースト通知 -->
     <div id="toast" class="toast"></div>
-
     <script>
         // トースト通知を表示する関数
         function showToast(message, isError = false) {
