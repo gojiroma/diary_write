@@ -28,7 +28,7 @@
 
         .diary-container {
             width: 95%;
-            max-width: 800px;
+            max-width: 1000px;
             height: 90vh;
             min-height: 600px;
             display: flex;
@@ -100,6 +100,107 @@
             text-orientation: upright;
         }
 
+        /* iconパネルスタイル */
+        .icon-panel {
+            width: 200px;
+            height: 100%;
+            background-color: #1e1e1e;
+            border-radius: 20px;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+
+        .icon-checkboxes {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+
+        .icon-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .icon-checkbox input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .icon-checkbox label {
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .icon-emoji {
+            font-size: 1.2em;
+        }
+
+        .icon-image {
+            width: 16px;
+            height: 16px;
+            object-fit: contain;
+            filter: grayscale(100%);
+        }
+
+        .icon-search {
+            margin-bottom: 10px;
+        }
+
+        .icon-search input {
+            width: 100%;
+            padding: 5px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .icon-search input:focus {
+            outline: none;
+        }
+
+        .icon-add {
+            margin-top: auto;
+        }
+
+        .icon-add input {
+            width: 100%;
+            padding: 5px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .icon-add button {
+            width: 100%;
+            padding: 5px;
+            background-color: #3d3d3d;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .icon-add button:hover {
+            background-color: #4d4d4d;
+        }
+
         /* トースト通知スタイル */
         .toast {
             visibility: hidden;
@@ -169,6 +270,12 @@
                 writing-mode: horizontal-tb;
                 text-orientation: mixed;
             }
+
+            .icon-panel {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+            }
         }
     </style>
 </head>
@@ -186,6 +293,22 @@
             </div>
             <div class="diary-box">
                 <textarea id="realDiary" placeholder="本日記を入力..."></textarea>
+            </div>
+            <!-- iconパネル -->
+            <div class="icon-panel">
+                <h3 style="font-size: 1em; margin: 0 0 10px 0;">アイコン選択</h3>
+                <div class="icon-search">
+                    <input type="text" id="iconSearch" placeholder="アイコンを検索...">
+                </div>
+                <div class="icon-checkboxes" id="iconCheckboxes">
+                    <!-- チェックボックスはJavaScriptで生成 -->
+                </div>
+                <div class="icon-add">
+                    <input type="text" id="newIconTitle" placeholder="タイトル">
+                    <input type="text" id="newIcon" placeholder="アイコン（絵文字またはURL）">
+                    <input type="text" id="newIconUrl" placeholder="URL（省略可）">
+                    <button id="addIconButton">アイコンを追加</button>
+                </div>
             </div>
         </div>
     </div>
@@ -215,11 +338,14 @@
         }
 
         // 日付フォーマット関数
-        const formatDateKey = (date) => {
+        const formatDateKey = (date, withHyphen = true) => {
             const year = date.getFullYear();
             const month = date.getMonth() + 1;
             const day = date.getDate();
-            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            if (withHyphen) {
+                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+            return `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
         };
 
         // 漢数字変換関数
@@ -262,11 +388,26 @@
         const dateDisplay = document.getElementById('dateDisplay');
         const prevDayButton = document.getElementById('prevDay');
         const nextDayButton = document.getElementById('nextDay');
+        const iconSearch = document.getElementById('iconSearch');
+        const iconCheckboxes = document.getElementById('iconCheckboxes');
+        const newIconTitle = document.getElementById('newIconTitle');
+        const newIcon = document.getElementById('newIcon');
+        const newIconUrl = document.getElementById('newIconUrl');
+        const addIconButton = document.getElementById('addIconButton');
 
         // 今日の日付を取得
         let currentDate = new Date();
         let currentDateKey = formatDateKey(currentDate);
-        let currentDateKeyNoHyphen = currentDateKey.replace(/-/g, '');
+        let currentDateKeyNoHyphen = formatDateKey(currentDate, false);
+        let allIcons = [];
+        let selectedIcons = new Set();
+
+        // キャッシュ用の変数
+        let cachedDiaryContent = null;
+        let cachedFakeContent = null;
+        let cachedIconsContent = null;
+        let cachedIcons = [];
+        let cachedSortedIcons = [];
 
         // 日付を表示
         dateDisplay.textContent = formatJapaneseDate(currentDate);
@@ -274,6 +415,7 @@
         // GitHubからファイルを取得する関数
         async function fetchGitHubFile(fileName, token) {
             try {
+                console.log(`Fetching ${fileName} from GitHub...`);
                 const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
                 const response = await fetch(apiUrl, {
                     headers: {
@@ -281,42 +423,135 @@
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
-                if (!response.ok) throw new Error('ファイルの取得に失敗しました');
+                if (!response.ok) throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
                 const fileData = await response.json();
                 const contentResponse = await fetch(fileData.download_url);
                 return await contentResponse.text();
             } catch (error) {
-                console.error('GitHubからのファイル取得エラー:', error);
+                console.error(`Error fetching ${fileName} from GitHub:`, error);
                 return null;
             }
         }
 
-        // 指定日のエントリを抽出
+        // CSVをパースする関数
+        function parseCSV(csv) {
+            if (!csv) return [];
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                return headers.reduce((obj, header, i) => {
+                    obj[header] = values[i] ? values[i].trim() : '';
+                    return obj;
+                }, {});
+            }).filter(row => row.icon);
+        }
+
+        // アイコンの頻度をカウント
+        function countIconFrequency(icons) {
+            const frequency = {};
+            icons.forEach(icon => {
+                if (icon.icon) {
+                    frequency[icon.icon] = (frequency[icon.icon] || 0) + 1;
+                }
+            });
+            return frequency;
+        }
+
+        // 頻度順にソートしたアイコン一覧を取得
+        function getSortedIcons(icons) {
+            const frequency = countIconFrequency(icons);
+            return [...new Map(icons.map(icon => [icon.icon, icon])).values()]
+                .map(icon => ({ ...icon, frequency: frequency[icon.icon] || 0 }))
+                .sort((a, b) => b.frequency - a.frequency);
+        }
+
+        // チェックボックスを生成
+        function renderIconCheckboxes(icons, searchTerm = '') {
+            iconCheckboxes.innerHTML = '';
+            const filteredIcons = icons.filter(icon =>
+                icon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                icon.icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (icon.url && icon.url.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+
+            filteredIcons.forEach(icon => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'icon-checkbox';
+                const isImageIcon = icon.icon.startsWith('http');
+
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
+                    <label for="icon-${icon.icon}">
+                        ${isImageIcon ?
+                        `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` :
+                        `<span class="icon-emoji">${icon.icon}</span>`
+                    }
+                        <span>${icon.title}</span>
+                    </label>
+                `;
+                checkbox.querySelector('input').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedIcons.add(icon.icon);
+                    } else {
+                        selectedIcons.delete(icon.icon);
+                    }
+                });
+                iconCheckboxes.appendChild(checkbox);
+            });
+        }
+
+        // 指定日のエントリを抽出（柔軟な日付フォーマットに対応）
         function extractEntry(content, dateKey) {
             if (!content) return null;
-            const dateRegex = new RegExp(`date: ${dateKey}[\\s\\S]*?content: \\|([\\s\\S]*?)(?=---|$)`);
-            const match = content.match(dateRegex);
+            const datePattern = dateKey.replace(/[-/]/g, '[\\/\\-]');
+            const entryRegex = new RegExp(`date:\\s*${datePattern}[\\s\\S]*?content:\\s*\\|([\\s\\S]*?)(?=---|\\n\\s*date:|$)`, 'i');
+            const match = content.match(entryRegex);
             return match ? match[1].trim().replace(/^\s{2}/gm, '') : null;
         }
 
         // 指定日のエントリを読み込む
         async function loadEntriesForDate(date) {
             const dateKey = formatDateKey(date);
-            const dateKeyNoHyphen = dateKey.replace(/-/g, '');
+            const dateKeyNoHyphen = formatDateKey(date, false);
             const token = localStorage.getItem('githubToken');
             if (!token) return;
 
             try {
-                const diaryContent = await fetchGitHubFile('entry.md', token);
-                const fakeContent = await fetchGitHubFile('fake.md', token);
+                console.log(`Loading entries for date: ${dateKey}`);
 
-                const diaryEntry = extractEntry(diaryContent, dateKeyNoHyphen);
-                const fakeEntry = extractEntry(fakeContent, dateKeyNoHyphen);
+                // キャッシュがなければGitHubから取得
+                if (!cachedDiaryContent || !cachedFakeContent || !cachedIconsContent) {
+                    console.log("Fetching from GitHub (not cached)...");
+                    const [diaryContent, fakeContent, iconsContent] = await Promise.all([
+                        fetchGitHubFile('entry.md', token),
+                        fetchGitHubFile('fake.md', token),
+                        fetchGitHubFile('icons.csv', token)
+                    ]);
+                    cachedDiaryContent = diaryContent;
+                    cachedFakeContent = fakeContent;
+                    cachedIconsContent = iconsContent;
+                    cachedIcons = parseCSV(cachedIconsContent);
+                    cachedSortedIcons = getSortedIcons(cachedIcons);
+                }
+
+                // エントリを抽出
+                const diaryEntry = extractEntry(cachedDiaryContent, dateKeyNoHyphen);
+                const fakeEntry = extractEntry(cachedFakeContent, dateKeyNoHyphen);
 
                 realDiary.value = diaryEntry || '';
                 fakeDiary.value = fakeEntry || '';
+                console.log(`Real diary entry: ${diaryEntry || 'None'}`);
+                console.log(`Fake diary entry: ${fakeEntry || 'None'}`);
+
+                // 選択中のアイコンを更新
+                selectedIcons.clear();
+                const todayIcons = cachedIcons.filter(icon => icon.date === dateKeyNoHyphen);
+                todayIcons.forEach(icon => selectedIcons.add(icon.icon));
+                renderIconCheckboxes(cachedSortedIcons, iconSearch.value);
             } catch (error) {
-                console.error('エントリ読み込みエラー:', error);
+                console.error('Error loading entries:', error);
+                showToast('エントリの読み込みに失敗しました。', true);
             }
         }
 
@@ -324,7 +559,7 @@
         prevDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() - 1);
             currentDateKey = formatDateKey(currentDate);
-            currentDateKeyNoHyphen = currentDateKey.replace(/-/g, '');
+            currentDateKeyNoHyphen = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
@@ -333,119 +568,146 @@
         nextDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() + 1);
             currentDateKey = formatDateKey(currentDate);
-            currentDateKeyNoHyphen = currentDateKey.replace(/-/g, '');
+            currentDateKeyNoHyphen = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
 
-        // 2ファイルを1コミットで更新する関数
-        async function updateMultipleFiles(token, dateKeyNoHyphen, realContent, fakeContent) {
+        // 3ファイルを1コミットで更新する関数
+        async function updateMultipleFiles(token, dateKeyNoHyphen, realContent, fakeContent, iconsContent) {
             const repoOwner = 'gojiroma';
             const repoName = 'diary';
             const branch = 'main';
             const baseUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
 
-            // 1. リポジトリの最新のコミットSHAを取得
-            const refResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-            if (!refResponse.ok) {
-                showToast('ブランチの取得に失敗しました。', true);
+            try {
+                // 1. リポジトリの最新のコミットSHAを取得
+                const refResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                if (!refResponse.ok) throw new Error('Failed to get branch');
+                const refData = await refResponse.json();
+                const latestCommitSha = refData.object.sha;
+
+                // 2. 最新のコミットのTree SHAを取得
+                const commitResponse = await fetch(`${baseUrl}/git/commits/${latestCommitSha}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                if (!commitResponse.ok) throw new Error('Failed to get commit');
+                const commitData = await commitResponse.json();
+                const latestTreeSha = commitData.tree.sha;
+
+                // 3. 新しいTreeを作成
+                const treeResponse = await fetch(`${baseUrl}/git/trees`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        base_tree: latestTreeSha,
+                        tree: [
+                            {
+                                path: 'entry.md',
+                                mode: '100644',
+                                type: 'blob',
+                                content: realContent
+                            },
+                            {
+                                path: 'fake.md',
+                                mode: '100644',
+                                type: 'blob',
+                                content: fakeContent
+                            },
+                            {
+                                path: 'icons.csv',
+                                mode: '100644',
+                                type: 'blob',
+                                content: iconsContent
+                            }
+                        ]
+                    })
+                });
+                if (!treeResponse.ok) throw new Error('Failed to create tree');
+                const treeData = await treeResponse.json();
+                const newTreeSha = treeData.sha;
+
+                // 4. 新しいコミットを作成
+                const newCommitResponse = await fetch(`${baseUrl}/git/commits`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Update entries for ${dateKeyNoHyphen}`,
+                        tree: newTreeSha,
+                        parents: [latestCommitSha]
+                    })
+                });
+                if (!newCommitResponse.ok) throw new Error('Failed to create commit');
+                const newCommitData = await newCommitResponse.json();
+                const newCommitSha = newCommitData.sha;
+
+                // 5. ブランチの参照を更新
+                const updateRefResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sha: newCommitSha
+                    })
+                });
+                if (!updateRefResponse.ok) throw new Error('Failed to update branch');
+
+                // キャッシュを更新
+                cachedDiaryContent = realContent;
+                cachedFakeContent = fakeContent;
+                cachedIconsContent = iconsContent;
+                cachedIcons = parseCSV(iconsContent);
+                cachedSortedIcons = getSortedIcons(cachedIcons);
+
+                return true;
+            } catch (error) {
+                console.error('Error updating files:', error);
+                showToast('更新に失敗しました。', true);
                 return false;
             }
-            const refData = await refResponse.json();
-            const latestCommitSha = refData.object.sha;
-
-            // 2. 最新のコミットのTree SHAを取得
-            const commitResponse = await fetch(`${baseUrl}/git/commits/${latestCommitSha}`, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-            if (!commitResponse.ok) {
-                showToast('コミットの取得に失敗しました。', true);
-                return false;
-            }
-            const commitData = await commitResponse.json();
-            const latestTreeSha = commitData.tree.sha;
-
-            // 3. 新しいTreeを作成
-            const treeResponse = await fetch(`${baseUrl}/git/trees`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    base_tree: latestTreeSha,
-                    tree: [
-                        {
-                            path: 'entry.md',
-                            mode: '100644',
-                            type: 'blob',
-                            content: realContent
-                        },
-                        {
-                            path: 'fake.md',
-                            mode: '100644',
-                            type: 'blob',
-                            content: fakeContent
-                        }
-                    ]
-                })
-            });
-            if (!treeResponse.ok) {
-                showToast('Treeの作成に失敗しました。', true);
-                return false;
-            }
-            const treeData = await treeResponse.json();
-            const newTreeSha = treeData.sha;
-
-            // 4. 新しいコミットを作成
-            const newCommitResponse = await fetch(`${baseUrl}/git/commits`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `Update entries for ${dateKeyNoHyphen}`,
-                    tree: newTreeSha,
-                    parents: [latestCommitSha]
-                })
-            });
-            if (!newCommitResponse.ok) {
-                showToast('コミットの作成に失敗しました。', true);
-                return false;
-            }
-            const newCommitData = await newCommitResponse.json();
-            const newCommitSha = newCommitData.sha;
-
-            // 5. ブランチの参照を更新
-            const updateRefResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    sha: newCommitSha
-                })
-            });
-            if (!updateRefResponse.ok) {
-                showToast('ブランチの更新に失敗しました。', true);
-                return false;
-            }
-
-            return true;
         }
+
+        // アイコン検索
+        iconSearch.addEventListener('input', () => {
+            renderIconCheckboxes(cachedSortedIcons, iconSearch.value);
+        });
+
+        // 新規アイコン追加
+        addIconButton.addEventListener('click', () => {
+            const title = newIconTitle.value.trim();
+            const icon = newIcon.value.trim();
+            const url = newIconUrl.value.trim();
+            if (title && icon) {
+                cachedIcons.push({ title, icon, url });
+                cachedSortedIcons = getSortedIcons(cachedIcons);
+                newIconTitle.value = '';
+                newIcon.value = '';
+                newIconUrl.value = '';
+                renderIconCheckboxes(cachedSortedIcons);
+                showToast('新規アイコンを追加しました。');
+            } else {
+                showToast('タイトルとアイコンを入力してください。', true);
+            }
+        });
 
         // 日付クリック時の処理（GitHubに更新）
         dateDisplay.addEventListener('click', async () => {
@@ -456,20 +718,19 @@
                 localStorage.setItem('githubToken', userToken);
             }
 
-            if (!realDiary.value.trim() && !fakeDiary.value.trim()) {
-                showToast('本文が空です。', true);
+            if (!realDiary.value.trim() && !fakeDiary.value.trim() && selectedIcons.size === 0) {
+                showToast('本文またはアイコンが空です。', true);
                 return;
             }
 
             try {
                 // 既存のコンテンツを取得
-                const existingEntryContent = await fetchGitHubFile('entry.md', token);
-                const existingFakeContent = await fetchGitHubFile('fake.md', token);
+                let newEntryContent = cachedDiaryContent || '';
+                let newFakeContent = cachedFakeContent || '';
+                let newIconsContent = cachedIconsContent || 'date,title,icon,url\n';
 
-                // 既存のエントリを検索
-                const entryRegex = new RegExp(`date: ${currentDateKeyNoHyphen}[\\s\\S]*?(?=---|$)`);
-                let newEntryContent = existingEntryContent || '';
-                let newFakeContent = existingFakeContent || '';
+                // 日記エントリを更新
+                const entryRegex = new RegExp(`date:\\s*${currentDateKeyNoHyphen}[\\s\\S]*?(?=---|$)`, 'i');
 
                 if (realDiary.value.trim()) {
                     if (entryRegex.test(newEntryContent)) {
@@ -493,13 +754,46 @@
                     }
                 }
 
+                // アイコンエントリを更新
+                const iconsToAdd = Array.from(selectedIcons).map(selectedIcon => {
+                    const existingIcon = cachedIcons.find(i => i.icon === selectedIcon);
+                    return {
+                        date: currentDateKeyNoHyphen,
+                        title: existingIcon?.title || selectedIcon,
+                        icon: selectedIcon,
+                        url: existingIcon?.url || ''
+                    };
+                });
+
+                // 既存の当日エントリを削除
+                const lines = newIconsContent.split('\n');
+                const header = lines[0];
+                const newLines = lines.filter(line => {
+                    const values = line.split(',');
+                    return values[0] !== currentDateKeyNoHyphen && line !== header;
+                });
+
+                // 新しいエントリを追加
+                iconsToAdd.forEach(icon => {
+                    newLines.push(`${icon.date},${icon.title},${icon.icon},${icon.url}`);
+                });
+
+                newIconsContent = [header, ...newLines].join('\n');
+
                 // 1回のコミットで更新
-                const success = await updateMultipleFiles(token, currentDateKeyNoHyphen, newEntryContent, newFakeContent);
+                const success = await updateMultipleFiles(
+                    token,
+                    currentDateKeyNoHyphen,
+                    newEntryContent,
+                    newFakeContent,
+                    newIconsContent
+                );
                 if (success) {
                     showToast('GitHubに更新しました。');
+                    loadEntriesForDate(currentDate);
                 }
             } catch (error) {
-                console.error('送信エラー:', error);
+                console.error('Error sending update:', error);
                 showToast('送信に失敗しました。', true);
             }
         });
@@ -510,6 +804,9 @@
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
                 if (userToken) {
                     localStorage.setItem('githubToken', userToken);
+                } else {
+                    showToast('GitHub Tokenが必要です。', true);
+                    return;
                 }
             }
             loadEntriesForDate(currentDate);
