@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="縦書き日記アプリ。偽日記と本日記の2ペイン対応。アイコン管理機能付き。GitHub連携で自動保存。">
+    <meta name="date" content="2026-02-27">
     <title>かくぞう</title>
     <link rel="icon" href="icon-write.png" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho&display=swap" rel="stylesheet">
-
     <style>
         body {
             background-color: #121212;
@@ -100,7 +101,6 @@
             text-orientation: upright;
         }
 
-        /* iconパネルスタイル */
         .icon-panel {
             width: 200px;
             height: 100%;
@@ -201,7 +201,6 @@
             background-color: #4d4d4d;
         }
 
-        /* トースト通知スタイル */
         .toast {
             visibility: hidden;
             min-width: 250px;
@@ -224,7 +223,6 @@
             opacity: 1;
         }
 
-        /* リンクコンテナ */
         .link-container {
             position: fixed;
             bottom: 20px;
@@ -235,7 +233,6 @@
             z-index: 10;
         }
 
-        /* リンクスタイル */
         .subtle-link {
             font-size: 0.8em;
             color: #aaa;
@@ -294,15 +291,12 @@
             <div class="diary-box">
                 <textarea id="realDiary" placeholder="本日記を入力..."></textarea>
             </div>
-            <!-- iconパネル -->
             <div class="icon-panel">
                 <h3 style="font-size: 1em; margin: 0 0 10px 0;">アイコン選択</h3>
                 <div class="icon-search">
                     <input type="text" id="iconSearch" placeholder="アイコンを検索...">
                 </div>
-                <div class="icon-checkboxes" id="iconCheckboxes">
-                    <!-- チェックボックスはJavaScriptで生成 -->
-                </div>
+                <div class="icon-checkboxes" id="iconCheckboxes"></div>
                 <div class="icon-add">
                     <input type="text" id="newIconTitle" placeholder="タイトル">
                     <input type="text" id="newIcon" placeholder="アイコン（絵文字またはURL）">
@@ -312,77 +306,47 @@
             </div>
         </div>
     </div>
-
-    <!-- リンクコンテナ -->
     <div class="link-container">
-        <a href="https://github.com/gojiroma/diary" class="subtle-link" target="_blank" rel="noopener noreferrer">
-            日記のrepo
-        </a>
-        <a href="https://nikki.poet.blue" class="subtle-link" target="_blank" rel="noopener noreferrer">
-            日記prod
-        </a>
+        <a href="https://github.com/gojiroma/diary" class="subtle-link" target="_blank"
+            rel="noopener noreferrer">日記のrepo</a>
+        <a href="https://nikki.poet.blue" class="subtle-link" target="_blank" rel="noopener noreferrer">日記prod</a>
     </div>
-
-    <!-- トースト通知 -->
     <div id="toast" class="toast"></div>
     <script>
-        // トースト通知を表示する関数
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.style.backgroundColor = isError ? '#ff4444' : '#4CAF50';
             toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+            setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        // 日付フォーマット関数
         const formatDateKey = (date, withHyphen = true) => {
             const year = date.getFullYear();
-            const month = date.getMonth() + 1;
-            const day = date.getDate();
-            if (withHyphen) {
-                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            }
-            return `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return withHyphen ? `${year}-${month}-${day}` : `${year}/${month}/${day}`;
         };
 
-        // 漢数字変換関数
-        const toKanjiNumber = (num) => {
-            const kanjiNumbers = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-            return num.toString().split('').map(digit => kanjiNumbers[digit]).join('');
-        };
-
-        const toKanjiMonth = (month) => {
-            const kanjiMonths = [
-                '一月', '二月', '三月', '四月', '五月', '六月',
-                '七月', '八月', '九月', '十月', '十一月', '十二月'
-            ];
-            return kanjiMonths[month - 1];
-        };
-
+        const toKanjiNumber = (num) => ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'][num] || num;
+        const toKanjiMonth = (month) => ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'][month - 1];
         const toKanjiDay = (day) => {
             if (day === 10) return '十';
             if (day === 20) return '二十';
             if (day === 30) return '三十';
-            if (day === 31) return '三十一';
             if (day < 10) return toKanjiNumber(day);
             if (day < 20) return '十' + toKanjiNumber(day - 10);
             if (day < 30) return '二十' + toKanjiNumber(day - 20);
             return toKanjiNumber(day);
         };
-
         const formatJapaneseDate = (date) => {
             const year = date.getFullYear();
             const month = date.getMonth() + 1;
             const day = date.getDate();
             const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
-            const reiwaYear = year - 2018;
-            return `令和${toKanjiNumber(reiwaYear)}年${toKanjiMonth(month)}${toKanjiDay(day)}日（${dayOfWeek}）`;
+            return `令和${toKanjiNumber(year - 2018)}年${toKanjiMonth(month)}${toKanjiDay(day)}日（${dayOfWeek}）`;
         };
 
-        // 要素を取得
         const realDiary = document.getElementById('realDiary');
         const fakeDiary = document.getElementById('fakeDiary');
         const dateDisplay = document.getElementById('dateDisplay');
@@ -395,113 +359,40 @@
         const newIconUrl = document.getElementById('newIconUrl');
         const addIconButton = document.getElementById('addIconButton');
 
-        // 今日の日付を取得
         let currentDate = new Date();
         let currentDateKey = formatDateKey(currentDate);
-        let currentDateKeyNoHyphen = formatDateKey(currentDate, false);
-        let allIcons = [];
+        let currentDateKeySlash = formatDateKey(currentDate, false);
         let selectedIcons = new Set();
-
-        // キャッシュ用の変数
         let cachedDiaryContent = null;
         let cachedFakeContent = null;
         let cachedIconsContent = null;
         let cachedIcons = [];
-        let cachedSortedIcons = [];
 
-        // 日付を表示
         dateDisplay.textContent = formatJapaneseDate(currentDate);
 
-        // GitHubからファイルを取得する関数
         async function fetchGitHubFile(fileName, token) {
             try {
-                console.log(`Fetching ${fileName} from GitHub...`);
                 const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                if (!response.ok) throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
+                const response = await fetch(apiUrl, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
+                if (!response.ok) throw new Error(`Failed to fetch ${fileName}`);
                 const fileData = await response.json();
-                const contentResponse = await fetch(fileData.download_url);
-                return await contentResponse.text();
+                return await (await fetch(fileData.download_url)).text();
             } catch (error) {
-                console.error(`Error fetching ${fileName} from GitHub:`, error);
+                console.error(`Error fetching ${fileName}:`, error);
                 return null;
             }
         }
 
-        // CSVをパースする関数
         function parseCSV(csv) {
             if (!csv) return [];
             const lines = csv.split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
             return lines.slice(1).map(line => {
                 const values = line.split(',');
-                return headers.reduce((obj, header, i) => {
-                    obj[header] = values[i] ? values[i].trim() : '';
-                    return obj;
-                }, {});
+                return headers.reduce((obj, header, i) => { obj[header] = values[i] ? values[i].trim() : ''; return obj; }, {});
             }).filter(row => row.icon);
         }
 
-        // アイコンの頻度をカウント
-        function countIconFrequency(icons) {
-            const frequency = {};
-            icons.forEach(icon => {
-                if (icon.icon) {
-                    frequency[icon.icon] = (frequency[icon.icon] || 0) + 1;
-                }
-            });
-            return frequency;
-        }
-
-        // 頻度順にソートしたアイコン一覧を取得
-        function getSortedIcons(icons) {
-            const frequency = countIconFrequency(icons);
-            return [...new Map(icons.map(icon => [icon.icon, icon])).values()]
-                .map(icon => ({ ...icon, frequency: frequency[icon.icon] || 0 }))
-                .sort((a, b) => b.frequency - a.frequency);
-        }
-
-        // チェックボックスを生成
-        function renderIconCheckboxes(icons, searchTerm = '') {
-            iconCheckboxes.innerHTML = '';
-            const filteredIcons = icons.filter(icon =>
-                icon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                icon.icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (icon.url && icon.url.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-
-            filteredIcons.forEach(icon => {
-                const checkbox = document.createElement('div');
-                checkbox.className = 'icon-checkbox';
-                const isImageIcon = icon.icon.startsWith('http');
-
-                checkbox.innerHTML = `
-                    <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
-                    <label for="icon-${icon.icon}">
-                        ${isImageIcon ?
-                        `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` :
-                        `<span class="icon-emoji">${icon.icon}</span>`
-                    }
-                        <span>${icon.title}</span>
-                    </label>
-                `;
-                checkbox.querySelector('input').addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        selectedIcons.add(icon.icon);
-                    } else {
-                        selectedIcons.delete(icon.icon);
-                    }
-                });
-                iconCheckboxes.appendChild(checkbox);
-            });
-        }
-
-        // 指定日のエントリを抽出（柔軟な日付フォーマットに対応）
         function extractEntry(content, dateKey) {
             if (!content) return null;
             const datePattern = dateKey.replace(/[-/]/g, '[\\/\\-]');
@@ -510,128 +401,105 @@
             return match ? match[1].trim().replace(/^\s{2}/gm, '') : null;
         }
 
-        // 指定日のエントリを読み込む
+        function renderIconCheckboxes(icons, searchTerm = '') {
+            iconCheckboxes.innerHTML = '';
+            const filteredIcons = icons.filter(icon =>
+                icon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                icon.icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (icon.url && icon.url.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+            filteredIcons.forEach(icon => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'icon-checkbox';
+                const isImageIcon = icon.icon.startsWith('http');
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
+                    <label for="icon-${icon.icon}">
+                        ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
+                        <span>${icon.title}</span>
+                    </label>
+                `;
+                checkbox.querySelector('input').addEventListener('change', (e) => {
+                    e.target.checked ? selectedIcons.add(icon.icon) : selectedIcons.delete(icon.icon);
+                });
+                iconCheckboxes.appendChild(checkbox);
+            });
+        }
+
         async function loadEntriesForDate(date) {
             const dateKey = formatDateKey(date);
-            const dateKeyNoHyphen = formatDateKey(date, false);
+            const dateKeySlash = formatDateKey(date, false);
             const token = localStorage.getItem('githubToken');
             if (!token) return;
 
             try {
-                console.log(`Loading entries for date: ${dateKey}`);
-
-                // キャッシュがなければGitHubから取得
                 if (!cachedDiaryContent || !cachedFakeContent || !cachedIconsContent) {
-                    console.log("Fetching from GitHub (not cached)...");
-                    const [diaryContent, fakeContent, iconsContent] = await Promise.all([
+                    [cachedDiaryContent, cachedFakeContent, cachedIconsContent] = await Promise.all([
                         fetchGitHubFile('entry.md', token),
                         fetchGitHubFile('fake.md', token),
                         fetchGitHubFile('icons.csv', token)
                     ]);
-                    cachedDiaryContent = diaryContent;
-                    cachedFakeContent = fakeContent;
-                    cachedIconsContent = iconsContent;
                     cachedIcons = parseCSV(cachedIconsContent);
-                    cachedSortedIcons = getSortedIcons(cachedIcons);
                 }
 
-                // エントリを抽出
-                const diaryEntry = extractEntry(cachedDiaryContent, dateKeyNoHyphen);
-                const fakeEntry = extractEntry(cachedFakeContent, dateKeyNoHyphen);
+                const diaryEntry = extractEntry(cachedDiaryContent, dateKey) || extractEntry(cachedDiaryContent, dateKeySlash);
+                const fakeEntry = extractEntry(cachedFakeContent, dateKey) || extractEntry(cachedFakeContent, dateKeySlash);
 
                 realDiary.value = diaryEntry || '';
                 fakeDiary.value = fakeEntry || '';
-                console.log(`Real diary entry: ${diaryEntry || 'None'}`);
-                console.log(`Fake diary entry: ${fakeEntry || 'None'}`);
 
-                // 選択中のアイコンを更新
                 selectedIcons.clear();
-                const todayIcons = cachedIcons.filter(icon => icon.date === dateKeyNoHyphen);
-                todayIcons.forEach(icon => selectedIcons.add(icon.icon));
-                renderIconCheckboxes(cachedSortedIcons, iconSearch.value);
+                cachedIcons.filter(icon => icon.date === dateKey || icon.date === dateKeySlash)
+                    .forEach(icon => selectedIcons.add(icon.icon));
+                renderIconCheckboxes(cachedIcons, iconSearch.value);
             } catch (error) {
                 console.error('Error loading entries:', error);
                 showToast('エントリの読み込みに失敗しました。', true);
             }
         }
 
-        // 日付を1日戻す
         prevDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() - 1);
             currentDateKey = formatDateKey(currentDate);
-            currentDateKeyNoHyphen = formatDateKey(currentDate, false);
+            currentDateKeySlash = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
 
-        // 日付を1日進める
         nextDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() + 1);
             currentDateKey = formatDateKey(currentDate);
-            currentDateKeyNoHyphen = formatDateKey(currentDate, false);
+            currentDateKeySlash = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
 
-        // 3ファイルを1コミットで更新する関数
-        async function updateMultipleFiles(token, dateKeyNoHyphen, realContent, fakeContent, iconsContent) {
+        async function updateMultipleFiles(token, dateKey, realContent, fakeContent, iconsContent) {
             const repoOwner = 'gojiroma';
             const repoName = 'diary';
             const branch = 'main';
             const baseUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
 
             try {
-                // 1. リポジトリの最新のコミットSHAを取得
-                const refResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
+                const refResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
                 if (!refResponse.ok) throw new Error('Failed to get branch');
                 const refData = await refResponse.json();
                 const latestCommitSha = refData.object.sha;
 
-                // 2. 最新のコミットのTree SHAを取得
-                const commitResponse = await fetch(`${baseUrl}/git/commits/${latestCommitSha}`, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
+                const commitResponse = await fetch(`${baseUrl}/git/commits/${latestCommitSha}`, { headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' } });
                 if (!commitResponse.ok) throw new Error('Failed to get commit');
                 const commitData = await commitResponse.json();
                 const latestTreeSha = commitData.tree.sha;
 
-                // 3. 新しいTreeを作成
                 const treeResponse = await fetch(`${baseUrl}/git/trees`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         base_tree: latestTreeSha,
                         tree: [
-                            {
-                                path: 'entry.md',
-                                mode: '100644',
-                                type: 'blob',
-                                content: realContent
-                            },
-                            {
-                                path: 'fake.md',
-                                mode: '100644',
-                                type: 'blob',
-                                content: fakeContent
-                            },
-                            {
-                                path: 'icons.csv',
-                                mode: '100644',
-                                type: 'blob',
-                                content: iconsContent
-                            }
+                            { path: 'entry.md', mode: '100644', type: 'blob', content: realContent },
+                            { path: 'fake.md', mode: '100644', type: 'blob', content: fakeContent },
+                            { path: 'icons.csv', mode: '100644', type: 'blob', content: iconsContent }
                         ]
                     })
                 });
@@ -639,175 +507,126 @@
                 const treeData = await treeResponse.json();
                 const newTreeSha = treeData.sha;
 
-                // 4. 新しいコミットを作成
                 const newCommitResponse = await fetch(`${baseUrl}/git/commits`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: `Update entries for ${dateKeyNoHyphen}`,
-                        tree: newTreeSha,
-                        parents: [latestCommitSha]
-                    })
+                    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Update entries for ${dateKey}`, tree: newTreeSha, parents: [latestCommitSha] })
                 });
                 if (!newCommitResponse.ok) throw new Error('Failed to create commit');
                 const newCommitData = await newCommitResponse.json();
                 const newCommitSha = newCommitData.sha;
 
-                // 5. ブランチの参照を更新
-                const updateRefResponse = await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
+                await fetch(`${baseUrl}/git/refs/heads/${branch}`, {
                     method: 'PATCH',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        sha: newCommitSha
-                    })
+                    headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sha: newCommitSha })
                 });
-                if (!updateRefResponse.ok) throw new Error('Failed to update branch');
 
-                // キャッシュを更新
                 cachedDiaryContent = realContent;
                 cachedFakeContent = fakeContent;
                 cachedIconsContent = iconsContent;
                 cachedIcons = parseCSV(iconsContent);
-                cachedSortedIcons = getSortedIcons(cachedIcons);
 
                 return true;
             } catch (error) {
                 console.error('Error updating files:', error);
-                showToast('更新に失敗しました。', true);
+                showToast('更新に失敗だぞ。', true);
                 return false;
             }
         }
 
-        // アイコン検索
-        iconSearch.addEventListener('input', () => {
-            renderIconCheckboxes(cachedSortedIcons, iconSearch.value);
-        });
-
-        // 新規アイコン追加
         addIconButton.addEventListener('click', () => {
             const title = newIconTitle.value.trim();
             const icon = newIcon.value.trim();
             const url = newIconUrl.value.trim();
             if (title && icon) {
                 cachedIcons.push({ title, icon, url });
-                cachedSortedIcons = getSortedIcons(cachedIcons);
                 newIconTitle.value = '';
                 newIcon.value = '';
                 newIconUrl.value = '';
-                renderIconCheckboxes(cachedSortedIcons);
-                showToast('新規アイコンを追加しました。');
+                renderIconCheckboxes(cachedIcons);
+                showToast('新規アイコンを追加してやったぞ。');
             } else {
-                showToast('タイトルとアイコンを入力してください。', true);
+                showToast('タイトルとアイコンはどうしたんだ。', true);
             }
         });
 
-        // 日付クリック時の処理（GitHubに更新）
         dateDisplay.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
             if (!token) {
-                const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
+                const userToken = prompt('GitHub Personal Access Tokenを入れてくれよな:');
                 if (!userToken) return;
                 localStorage.setItem('githubToken', userToken);
             }
 
             if (!realDiary.value.trim() && !fakeDiary.value.trim() && selectedIcons.size === 0) {
-                showToast('本文またはアイコンが空です。', true);
+                showToast('本文かアイコンが空だぞ。', true);
                 return;
             }
 
             try {
-                // 既存のコンテンツを取得
                 let newEntryContent = cachedDiaryContent || '';
                 let newFakeContent = cachedFakeContent || '';
                 let newIconsContent = cachedIconsContent || 'date,title,icon,url\n';
 
-                // 日記エントリを更新
-                const entryRegex = new RegExp(`date:\\s*${currentDateKeyNoHyphen}[\\s\\S]*?(?=---|$)`, 'i');
+                const entryRegex = new RegExp(`date:\\s*${currentDateKey}[\\s\\S]*?(?=---|$)`);
+                const entryRegexSlash = new RegExp(`date:\\s*${currentDateKeySlash}[\\s\\S]*?(?=---|$)`);
 
                 if (realDiary.value.trim()) {
                     if (entryRegex.test(newEntryContent)) {
-                        newEntryContent = newEntryContent.replace(
-                            entryRegex,
-                            `date: ${currentDateKeyNoHyphen}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`
-                        );
+                        newEntryContent = newEntryContent.replace(entryRegex, `date: ${currentDateKey}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    } else if (entryRegexSlash.test(newEntryContent)) {
+                        newEntryContent = newEntryContent.replace(entryRegexSlash, `date: ${currentDateKeySlash}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
                     } else {
-                        newEntryContent += `\n---\ndate: ${currentDateKeyNoHyphen}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                        newEntryContent += `\n---\ndate: ${currentDateKeySlash}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`;
                     }
                 }
 
                 if (fakeDiary.value.trim()) {
                     if (entryRegex.test(newFakeContent)) {
-                        newFakeContent = newFakeContent.replace(
-                            entryRegex,
-                            `date: ${currentDateKeyNoHyphen}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`
-                        );
+                        newFakeContent = newFakeContent.replace(entryRegex, `date: ${currentDateKey}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    } else if (entryRegexSlash.test(newFakeContent)) {
+                        newFakeContent = newFakeContent.replace(entryRegexSlash, `date: ${currentDateKeySlash}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
                     } else {
-                        newFakeContent += `\n---\ndate: ${currentDateKeyNoHyphen}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                        newFakeContent += `\n---\ndate: ${currentDateKeySlash}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`;
                     }
                 }
 
-                // アイコンエントリを更新
                 const iconsToAdd = Array.from(selectedIcons).map(selectedIcon => {
                     const existingIcon = cachedIcons.find(i => i.icon === selectedIcon);
                     return {
-                        date: currentDateKeyNoHyphen,
+                        date: currentDateKeySlash,
                         title: existingIcon?.title || selectedIcon,
                         icon: selectedIcon,
                         url: existingIcon?.url || ''
                     };
                 });
 
-                // 既存の当日エントリを削除
                 const lines = newIconsContent.split('\n');
                 const header = lines[0];
                 const newLines = lines.filter(line => {
                     const values = line.split(',');
-                    return values[0] !== currentDateKeyNoHyphen && line !== header;
+                    return values[0] !== currentDateKey && values[0] !== currentDateKeySlash && line !== header;
                 });
 
-                // 新しいエントリを追加
-                iconsToAdd.forEach(icon => {
-                    newLines.push(`${icon.date},${icon.title},${icon.icon},${icon.url}`);
-                });
+                newIconsContent = [header, ...iconsToAdd.map(icon => `${icon.date},${icon.title},${icon.icon},${icon.url}`), ...newLines].join('\n');
 
-                newIconsContent = [header, ...newLines].join('\n');
-
-                // 1回のコミットで更新
-                const success = await updateMultipleFiles(
-                    token,
-                    currentDateKeyNoHyphen,
-                    newEntryContent,
-                    newFakeContent,
-                    newIconsContent
-                );
+                const success = await updateMultipleFiles(token, currentDateKeySlash, newEntryContent, newFakeContent, newIconsContent);
                 if (success) {
-                    showToast('GitHubに更新しました。');
+                    showToast('pushしといたぞ。');
                     loadEntriesForDate(currentDate);
                 }
             } catch (error) {
                 console.error('Error sending update:', error);
-                showToast('送信に失敗しました。', true);
+                showToast('送信に失敗だ。', true);
             }
         });
 
-        // ページロード時の初期化
         window.addEventListener('load', () => {
             if (!localStorage.getItem('githubToken')) {
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
-                if (userToken) {
-                    localStorage.setItem('githubToken', userToken);
-                } else {
-                    showToast('GitHub Tokenが必要です。', true);
-                    return;
-                }
+                if (userToken) localStorage.setItem('githubToken', userToken);
+                else { showToast('GitHub Tokenが必要だぜ。', true); return; }
             }
             loadEntriesForDate(currentDate);
         });
