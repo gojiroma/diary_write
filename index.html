@@ -321,11 +321,11 @@
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        const formatDateKey = (date, withHyphen = true) => {
+        const formatDateKey = (date, forMd = true) => {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
-            return withHyphen ? `${year}-${month}-${day}` : `${year}/${month}/${day}`;
+            return forMd ? `${year}${month}${day}` : `${year}/${month}/${day}`;
         };
 
         const toKanjiNumber = (num) => ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'][num] || num;
@@ -360,8 +360,8 @@
         const addIconButton = document.getElementById('addIconButton');
 
         let currentDate = new Date();
-        let currentDateKey = formatDateKey(currentDate);
-        let currentDateKeySlash = formatDateKey(currentDate, false);
+        let currentDateKeyMd = formatDateKey(currentDate, true);
+        let currentDateKeyCsv = formatDateKey(currentDate, false);
         let selectedIcons = new Set();
         let cachedDiaryContent = null;
         let cachedFakeContent = null;
@@ -393,12 +393,12 @@
             }).filter(row => row.icon);
         }
 
-        function extractEntry(content, dateKey) {
+        function extractEntry(content, dateKeyMd, dateKeyCsv) {
             if (!content) return null;
-            const datePattern = dateKey.replace(/[-/]/g, '[\\/\\-]');
-            const entryRegex = new RegExp(`date:\\s*${datePattern}[\\s\\S]*?content:\\s*\\|([\\s\\S]*?)(?=---|\\n\\s*date:|$)`, 'i');
+            const datePattern = dateKeyMd + '|' + dateKeyCsv.replace(/\//g, '\\/');
+            const entryRegex = new RegExp(`date:\\s*(${datePattern})[\\s\\S]*?content:\\s*\\|([\\s\\S]*?)(?=---|\\n\\s*date:|$)`, 'i');
             const match = content.match(entryRegex);
-            return match ? match[1].trim().replace(/^\s{2}/gm, '') : null;
+            return match ? match[2].trim().replace(/^\s{2}/gm, '') : null;
         }
 
         function renderIconCheckboxes(icons, searchTerm = '') {
@@ -413,12 +413,12 @@
                 checkbox.className = 'icon-checkbox';
                 const isImageIcon = icon.icon.startsWith('http');
                 checkbox.innerHTML = `
-                    <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
-                    <label for="icon-${icon.icon}">
-                        ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
-                        <span>${icon.title}</span>
-                    </label>
-                `;
+                        <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
+                        <label for="icon-${icon.icon}">
+                            ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
+                            <span>${icon.title}</span>
+                        </label>
+                    `;
                 checkbox.querySelector('input').addEventListener('change', (e) => {
                     e.target.checked ? selectedIcons.add(icon.icon) : selectedIcons.delete(icon.icon);
                 });
@@ -427,8 +427,8 @@
         }
 
         async function loadEntriesForDate(date) {
-            const dateKey = formatDateKey(date);
-            const dateKeySlash = formatDateKey(date, false);
+            const dateKeyMd = formatDateKey(date, true);
+            const dateKeyCsv = formatDateKey(date, false);
             const token = localStorage.getItem('githubToken');
             if (!token) return;
 
@@ -442,14 +442,14 @@
                     cachedIcons = parseCSV(cachedIconsContent);
                 }
 
-                const diaryEntry = extractEntry(cachedDiaryContent, dateKey) || extractEntry(cachedDiaryContent, dateKeySlash);
-                const fakeEntry = extractEntry(cachedFakeContent, dateKey) || extractEntry(cachedFakeContent, dateKeySlash);
+                const diaryEntry = extractEntry(cachedDiaryContent, dateKeyMd, dateKeyCsv);
+                const fakeEntry = extractEntry(cachedFakeContent, dateKeyMd, dateKeyCsv);
 
                 realDiary.value = diaryEntry || '';
                 fakeDiary.value = fakeEntry || '';
 
                 selectedIcons.clear();
-                cachedIcons.filter(icon => icon.date === dateKey || icon.date === dateKeySlash)
+                cachedIcons.filter(icon => icon.date === dateKeyCsv)
                     .forEach(icon => selectedIcons.add(icon.icon));
                 renderIconCheckboxes(cachedIcons, iconSearch.value);
             } catch (error) {
@@ -460,21 +460,21 @@
 
         prevDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() - 1);
-            currentDateKey = formatDateKey(currentDate);
-            currentDateKeySlash = formatDateKey(currentDate, false);
+            currentDateKeyMd = formatDateKey(currentDate, true);
+            currentDateKeyCsv = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
 
         nextDayButton.addEventListener('click', () => {
             currentDate.setDate(currentDate.getDate() + 1);
-            currentDateKey = formatDateKey(currentDate);
-            currentDateKeySlash = formatDateKey(currentDate, false);
+            currentDateKeyMd = formatDateKey(currentDate, true);
+            currentDateKeyCsv = formatDateKey(currentDate, false);
             dateDisplay.textContent = formatJapaneseDate(currentDate);
             loadEntriesForDate(currentDate);
         });
 
-        async function updateMultipleFiles(token, dateKey, realContent, fakeContent, iconsContent) {
+        async function updateMultipleFiles(token, dateKeyMd, dateKeyCsv, realContent, fakeContent, iconsContent) {
             const repoOwner = 'gojiroma';
             const repoName = 'diary';
             const branch = 'main';
@@ -510,7 +510,7 @@
                 const newCommitResponse = await fetch(`${baseUrl}/git/commits`, {
                     method: 'POST',
                     headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Update entries for ${dateKey}`, tree: newTreeSha, parents: [latestCommitSha] })
+                    body: JSON.stringify({ message: `Update entries for ${dateKeyMd}`, tree: newTreeSha, parents: [latestCommitSha] })
                 });
                 if (!newCommitResponse.ok) throw new Error('Failed to create commit');
                 const newCommitData = await newCommitResponse.json();
@@ -569,33 +569,33 @@
                 let newFakeContent = cachedFakeContent || '';
                 let newIconsContent = cachedIconsContent || 'date,title,icon,url\n';
 
-                const entryRegex = new RegExp(`date:\\s*${currentDateKey}[\\s\\S]*?(?=---|$)`);
-                const entryRegexSlash = new RegExp(`date:\\s*${currentDateKeySlash}[\\s\\S]*?(?=---|$)`);
+                const entryRegexMd = new RegExp(`date:\\s*${currentDateKeyMd}[\\s\\S]*?(?=---|$)`);
+                const entryRegexCsv = new RegExp(`date:\\s*${currentDateKeyCsv.replace(/\//g, '\\/')}[\\s\\S]*?(?=---|$)`);
 
                 if (realDiary.value.trim()) {
-                    if (entryRegex.test(newEntryContent)) {
-                        newEntryContent = newEntryContent.replace(entryRegex, `date: ${currentDateKey}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
-                    } else if (entryRegexSlash.test(newEntryContent)) {
-                        newEntryContent = newEntryContent.replace(entryRegexSlash, `date: ${currentDateKeySlash}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    if (entryRegexMd.test(newEntryContent)) {
+                        newEntryContent = newEntryContent.replace(entryRegexMd, `date: ${currentDateKeyMd}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    } else if (entryRegexCsv.test(newEntryContent)) {
+                        newEntryContent = newEntryContent.replace(entryRegexCsv, `date: ${currentDateKeyMd}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`);
                     } else {
-                        newEntryContent += `\n---\ndate: ${currentDateKeySlash}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                        newEntryContent += `\n---\ndate: ${currentDateKeyMd}\ncontent: |\n  ${realDiary.value.replace(/\n/g, '\n  ')}\n---`;
                     }
                 }
 
                 if (fakeDiary.value.trim()) {
-                    if (entryRegex.test(newFakeContent)) {
-                        newFakeContent = newFakeContent.replace(entryRegex, `date: ${currentDateKey}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
-                    } else if (entryRegexSlash.test(newFakeContent)) {
-                        newFakeContent = newFakeContent.replace(entryRegexSlash, `date: ${currentDateKeySlash}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    if (entryRegexMd.test(newFakeContent)) {
+                        newFakeContent = newFakeContent.replace(entryRegexMd, `date: ${currentDateKeyMd}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
+                    } else if (entryRegexCsv.test(newFakeContent)) {
+                        newFakeContent = newFakeContent.replace(entryRegexCsv, `date: ${currentDateKeyMd}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`);
                     } else {
-                        newFakeContent += `\n---\ndate: ${currentDateKeySlash}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`;
+                        newFakeContent += `\n---\ndate: ${currentDateKeyMd}\ncontent: |\n  ${fakeDiary.value.replace(/\n/g, '\n  ')}\n---`;
                     }
                 }
 
                 const iconsToAdd = Array.from(selectedIcons).map(selectedIcon => {
                     const existingIcon = cachedIcons.find(i => i.icon === selectedIcon);
                     return {
-                        date: currentDateKeySlash,
+                        date: currentDateKeyCsv,
                         title: existingIcon?.title || selectedIcon,
                         icon: selectedIcon,
                         url: existingIcon?.url || ''
@@ -606,12 +606,12 @@
                 const header = lines[0];
                 const newLines = lines.filter(line => {
                     const values = line.split(',');
-                    return values[0] !== currentDateKey && values[0] !== currentDateKeySlash && line !== header;
+                    return values[0] !== currentDateKeyMd && values[0] !== currentDateKeyCsv && line !== header;
                 });
 
                 newIconsContent = [header, ...iconsToAdd.map(icon => `${icon.date},${icon.title},${icon.icon},${icon.url}`), ...newLines].join('\n');
 
-                const success = await updateMultipleFiles(token, currentDateKeySlash, newEntryContent, newFakeContent, newIconsContent);
+                const success = await updateMultipleFiles(token, currentDateKeyMd, currentDateKeyCsv, newEntryContent, newFakeContent, newIconsContent);
                 if (success) {
                     showToast('pushしといたぞ。');
                     loadEntriesForDate(currentDate);
@@ -631,6 +631,7 @@
             loadEntriesForDate(currentDate);
         });
     </script>
+    
 </body>
 
 </html>
