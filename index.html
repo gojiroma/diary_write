@@ -12,6 +12,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho&display=swap" rel="stylesheet">
     <style>
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
         body {
             background-color: #121212;
             color: #ffe4da;
@@ -43,7 +47,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 10px;
-            height:800px;
+            height: 800px;
         }
 
         .diary-box {
@@ -247,6 +251,23 @@
             color: #ffe4da;
         }
 
+        .copy-button {
+            width: 100%;
+            padding: 8px;
+            background-color: #3d3d3d;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .copy-button:hover {
+            background-color: #4d4d4d;
+        }
+
+
         @media (max-width: 600px) {
             .diary-boxes {
                 flex-direction: column;
@@ -283,6 +304,7 @@
         <div class="diary-boxes">
             <div class="diary-box">
                 <textarea id="fakeDiary" placeholder="偽日記を入力..."></textarea>
+                <button class="copy-button" data-target="fakeDiary">copy text</button>
             </div>
             <div class="date-display" id="dateDisplayContainer">
                 <span class="date-nav" id="prevDay">↑・</span>
@@ -291,6 +313,7 @@
             </div>
             <div class="diary-box">
                 <textarea id="realDiary" placeholder="本日記を入力..."></textarea>
+                <button class="copy-button" data-target="realDiary">copy text</button>
             </div>
             <div class="icon-panel">
                 <h3 style="font-size: 1em; margin: 0 0 10px 0;">アイコン選択</h3>
@@ -388,10 +411,25 @@
             if (!csv) return [];
             const lines = csv.split('\n');
             const headers = lines[0].split(',').map(h => h.trim());
-            return lines.slice(1).map(line => {
+            const icons = lines.slice(1).map(line => {
                 const values = line.split(',');
-                return headers.reduce((obj, header, i) => { obj[header] = values[i] ? values[i].trim() : ''; return obj; }, {});
+                return headers.reduce((obj, header, i) => {
+                    obj[header] = values[i] ? values[i].trim() : '';
+                    return obj;
+                }, {});
             }).filter(row => row.icon);
+
+            // 重複除去（iconプロパティで判定）
+            const uniqueIcons = [];
+            const seenIcons = new Set();
+            icons.forEach(icon => {
+                if (!seenIcons.has(icon.icon)) {
+                    seenIcons.add(icon.icon);
+                    uniqueIcons.push(icon);
+                }
+            });
+
+            return uniqueIcons;
         }
 
         function extractEntry(content, dateKeyMd, dateKeyCsv) {
@@ -401,25 +439,31 @@
             const match = content.match(entryRegex);
             return match ? match[2].trim().replace(/^\s{2}/gm, '') : null;
         }
-
         function renderIconCheckboxes(icons, searchTerm = '') {
             iconCheckboxes.innerHTML = '';
-            const filteredIcons = icons.filter(icon =>
+
+            // 選択済みアイコンを先頭に表示
+            const selected = icons.filter(icon => selectedIcons.has(icon.icon));
+            const unselected = icons.filter(icon => !selectedIcons.has(icon.icon));
+
+            // 検索フィルタ
+            const filteredIcons = [...selected, ...unselected].filter(icon =>
                 icon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 icon.icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (icon.url && icon.url.toLowerCase().includes(searchTerm.toLowerCase()))
             );
+
             filteredIcons.forEach(icon => {
                 const checkbox = document.createElement('div');
                 checkbox.className = 'icon-checkbox';
                 const isImageIcon = icon.icon.startsWith('http');
                 checkbox.innerHTML = `
-                        <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
-                        <label for="icon-${icon.icon}">
-                            ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
-                            <span>${icon.title}</span>
-                        </label>
-                    `;
+            <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
+            <label for="icon-${icon.icon}">
+                ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
+                <span>${icon.title}</span>
+            </label>
+        `;
                 checkbox.querySelector('input').addEventListener('change', (e) => {
                     e.target.checked ? selectedIcons.add(icon.icon) : selectedIcons.delete(icon.icon);
                 });
@@ -631,8 +675,23 @@
             }
             loadEntriesForDate(currentDate);
         });
+        // コピーボタンのクリックイベント
+            document.querySelectorAll('.copy-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.getAttribute('data-target');
+                    const textarea = document.getElementById(targetId);
+                    if (textarea.value.trim()) {
+                        textarea.select();
+                        document.execCommand('copy');
+                        showToast('テキストをコピーしたぞ。');
+                    } else {
+                        showToast('コピーするテキストがないぞ。', true);
+                    }
+                });
+            });
+
     </script>
-    
+
 </body>
 
 </html>
