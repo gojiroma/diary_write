@@ -317,103 +317,117 @@
             return dates;
         }
         function renderMatrix() {
-            const thead = iconMatrix.querySelector('thead tr');
-            const tbody = iconMatrix.querySelector('tbody');
-            thead.innerHTML = '';
-            tbody.innerHTML = '';
-            const dateHeader = document.createElement('th');
-            dateHeader.className = 'icon-header';
-            dateHeader.innerHTML = '&nbsp;';
-            thead.appendChild(dateHeader);
-            dates.forEach(date => {
-                const th = document.createElement('th');
-                th.className = 'date-header';
-                th.textContent = formatDateMD(date);
-                th.dataset.date = formatDateKey(date);
-                thead.appendChild(th);
-            });
-            const filteredIcons = icons.filter(icon =>
-                icon.title.toLowerCase().includes(iconSearch.value.toLowerCase()) ||
-                icon.icon.toLowerCase().includes(iconSearch.value.toLowerCase())
-            );
-            filteredIcons.forEach(icon => {
-                const tr = document.createElement('tr');
-                const th = document.createElement('th');
-                th.className = 'icon-header';
-                if (icon.icon.startsWith('http')) {
-                    th.innerHTML = `<img src="${icon.icon}" class="icon-image"><span class="icon-title">${icon.title}</span>`;
-                } else {
-                    th.innerHTML = `<span class="icon-emoji">${icon.icon}</span><span class="icon-title">${icon.title}</span>`;
-                }
-                tr.appendChild(th);
-   dates.forEach(date => {
-                    const td = document.createElement('td');
-                    const dateKey = formatDateKey(date);
-                    const dateMD = formatDateMD(date);
+                const thead = iconMatrix.querySelector('thead tr');
+                const tbody = iconMatrix.querySelector('tbody');
+                thead.innerHTML = '';
+                tbody.innerHTML = '';
 
-                    // 日付をセル内に直接表示
-                    td.textContent = dateMD;
+                // 日付ヘッダー行の作成
+                const dateHeader = document.createElement('th');
+                dateHeader.className = 'icon-header';
+                dateHeader.innerHTML = '&nbsp;';
+                thead.appendChild(dateHeader);
 
-                    if (originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon)) {
-                        td.classList.add('committed');
-                    }
-
-                    if (workingMatrix[dateKey] && workingMatrix[dateKey].includes(icon.icon) &&
-                        !(originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon))) {
-                        td.classList.add('pending');
-                    }
-
-                    td.addEventListener('click', () => {
-                        if (td.classList.contains('committed')) {
-                            td.classList.remove('committed');
-                            if (!originalMatrix[dateKey]) originalMatrix[dateKey] = [];
-                            const originalIndex = originalMatrix[dateKey].indexOf(icon.icon);
-                            if (originalIndex > -1) {
-                                originalMatrix[dateKey].splice(originalIndex, 1);
-                            }
-                        }
-
-                        td.classList.toggle('pending');
-
-                        if (!workingMatrix[dateKey]) workingMatrix[dateKey] = [];
-                        const workingIndex = workingMatrix[dateKey].indexOf(icon.icon);
-                        if (td.classList.contains('pending') && workingIndex === -1) {
-                            workingMatrix[dateKey].push(icon.icon);
-                        } else if (!td.classList.contains('pending') && workingIndex > -1) {
-                            workingMatrix[dateKey].splice(workingIndex, 1);
-                        }
-                    });
-                    tr.appendChild(td);
+                dates.forEach(date => {
+                    const th = document.createElement('th');
+                    th.className = 'date-header';
+                    th.textContent = formatDateMD(date);
+                    th.dataset.date = formatDateKey(date);
+                    thead.appendChild(th);
                 });
 
-                tbody.appendChild(tr);
-            });
-        }
-        async function loadData() {
-            const token = localStorage.getItem('githubToken');
-            if (!token) {
-                showToast('GitHub Tokenが必要だ。', true);
-                return;
-            }
-            const iconsContent = await fetchGitHubFile('icons.csv', token);
-            const iconData = parseCSV(iconsContent);
-            icons = [...new Map(iconData.map(item => [item.icon, item])).values()];
-            dates = generateAllDates(iconData);
-            originalMatrix = {};
-            workingMatrix = { ...originalMatrix };
-            iconData.forEach(entry => {
-                if (entry.date && entry.icon) {
-                    if (!originalMatrix[entry.date]) originalMatrix[entry.date] = [];
-                    if (!originalMatrix[entry.date].includes(entry.icon)) {
-                        originalMatrix[entry.date].push(entry.icon);
+                // 検索ボックスが空の場合は全アイコンを表示
+                const searchTerm = iconSearch.value.toLowerCase();
+                const filteredIcons = searchTerm
+                    ? icons.filter(icon =>
+                        icon.title.toLowerCase().includes(searchTerm) ||
+                        icon.icon.toLowerCase().includes(searchTerm))
+                    : icons;
+
+                filteredIcons.forEach(icon => {
+                    const tr = document.createElement('tr');
+                    const th = document.createElement('th');
+                    th.className = 'icon-header';
+                    if (icon.icon.startsWith('http')) {
+                        th.innerHTML = `<img src="${icon.icon}" class="icon-image"><span class="icon-title">${icon.title}</span>`;
+                    } else {
+                        th.innerHTML = `<span class="icon-emoji">${icon.icon}</span><span class="icon-title">${icon.title}</span>`;
                     }
-                }
-            });
-            Object.keys(originalMatrix).forEach(dateKey => {
-                workingMatrix[dateKey] = [...originalMatrix[dateKey]];
-            });
-            renderMatrix();
+                    tr.appendChild(th);
+
+                    dates.forEach(date => {
+                        const td = document.createElement('td');
+                        const dateKey = formatDateKey(date);
+                        const dateMD = formatDateMD(date);
+
+                        if (originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon)) {
+                            td.classList.add('committed');
+                        }
+
+                        if (workingMatrix[dateKey] && workingMatrix[dateKey].includes(icon.icon) &&
+                            !(originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon))) {
+                            td.classList.add('pending');
+                        }
+
+                        td.addEventListener('click', () => {
+                            if (td.classList.contains('committed')) {
+                                td.classList.remove('committed');
+                                if (!originalMatrix[dateKey]) originalMatrix[dateKey] = [];
+                                const originalIndex = originalMatrix[dateKey].indexOf(icon.icon);
+                                if (originalIndex > -1) {
+                                    originalMatrix[dateKey].splice(originalIndex, 1);
+                                }
+                            }
+
+                            td.classList.toggle('pending');
+
+                            if (!workingMatrix[dateKey]) workingMatrix[dateKey] = [];
+                            const workingIndex = workingMatrix[dateKey].indexOf(icon.icon);
+                            if (td.classList.contains('pending') && workingIndex === -1) {
+                                workingMatrix[dateKey].push(icon.icon);
+                            } else if (!td.classList.contains('pending') && workingIndex > -1) {
+                                workingMatrix[dateKey].splice(workingIndex, 1);
+                            }
+                        });
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            }
+    // parseCSV関数は変更しない
+    // loadData関数内のicons配列生成部分を修正
+    async function loadData() {
+        const token = localStorage.getItem('githubToken');
+        if (!token) {
+            showToast('GitHub Tokenが必要だ。', true);
+            return;
         }
+
+        const iconsContent = await fetchGitHubFile('icons.csv', token);
+        const iconData = parseCSV(iconsContent);
+
+        // 重複除去をiconとtitleの組み合わせで行う
+        icons = Array.from(new Map(iconData.map(item => [`${item.icon}|${item.title}`, item])).values());
+
+        dates = generateAllDates(iconData);
+        originalMatrix = {};
+        workingMatrix = { ...originalMatrix };
+
+        iconData.forEach(entry => {
+            if (entry.date && entry.icon) {
+                if (!originalMatrix[entry.date]) originalMatrix[entry.date] = [];
+                if (!originalMatrix[entry.date].includes(entry.icon)) {
+                    originalMatrix[entry.date].push(entry.icon);
+                }
+            }
+        });
+
+        Object.keys(originalMatrix).forEach(dateKey => {
+            workingMatrix[dateKey] = [...originalMatrix[dateKey]];
+        });
+
+        renderMatrix();
+    }
         saveButton.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
             if (!token) {
@@ -471,19 +485,27 @@
         cancelAddIcon.addEventListener('click', () => {
             addIconModal.style.display = 'none';
         });
-        confirmAddIcon.addEventListener('click', () => {
-            const title = newIconTitle.value.trim();
-            const icon = newIcon.value.trim();
-            const url = newIconUrl.value.trim();
-            if (!title || !icon) {
-                showToast('タイトルとアイコンは必須だ。', true);
-                return;
-            }
-            icons.push({ title, icon, url });
-            addIconModal.style.display = 'none';
-            renderMatrix();
-            showToast('アイコンを追加した。');
-        });
+    confirmAddIcon.addEventListener('click', () => {
+        const title = newIconTitle.value.trim();
+        const icon = newIcon.value.trim();
+        const url = newIconUrl.value.trim();
+
+        if (!title || !icon) {
+            showToast('タイトルとアイコンは必須だ。', true);
+            return;
+        }
+
+        // 重複チェック
+        if (icons.some(existingIcon => existingIcon.icon === icon)) {
+            showToast('同じアイコンは既に存在する。', true);
+            return;
+        }
+
+        icons.push({ title, icon, url });
+        addIconModal.style.display = 'none';
+        renderMatrix();
+        showToast('アイコンを追加した。');
+    });
         window.addEventListener('load', () => {
             if (!localStorage.getItem('githubToken')) {
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
