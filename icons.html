@@ -51,6 +51,8 @@
         .matrix-table td {
             background-color: #2d2d2d;
             cursor: pointer;
+            position: relative;
+            font-size: 0.6em; 
         }
 
         .matrix-table td.committed {
@@ -246,29 +248,24 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
-
         const formatDateKey = (date) => {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}/${month}/${day}`;
         };
-
         const formatDateMD = (date) => {
             const month = date.getMonth() + 1;
             const day = date.getDate();
             return `${month}/${day}`;
         };
-
         const iconSearch = document.getElementById('iconSearch');
         const saveButton = document.getElementById('saveButton');
         const iconMatrix = document.getElementById('iconMatrix');
-
         let icons = [];
         let dates = [];
         let originalMatrix = {};
         let workingMatrix = {};
-
         async function fetchGitHubFile(fileName, token) {
             try {
                 const apiUrl = `https://api.github.com/repos/gojiroma/diary/contents/${fileName}`;
@@ -281,7 +278,6 @@
                 return null;
             }
         }
-
         function parseCSV(csv) {
             if (!csv) return [];
             const lines = csv.split('\n');
@@ -296,76 +292,50 @@
                 })
                 .filter(row => row.icon && row.date);
         }
-
         function generateAllDates(iconData) {
             const startDate = new Date(2025, 11, 6); // 2025/12/6
             const endDate = new Date(); // 今日
             endDate.setHours(0, 0, 0, 0);
-
             const allDates = generateDateRange(startDate, endDate);
             const usedDates = new Set();
-
             iconData.forEach(entry => {
                 if (entry.date) {
                     const [year, month, day] = entry.date.split('/').map(Number);
                     usedDates.add(new Date(year, month - 1, day).getTime());
                 }
             });
-
             return allDates;
         }
-
         function generateDateRange(startDate, endDate) {
             const dates = [];
             const currentDate = new Date(startDate);
             const lastDate = new Date(endDate);
-
             while (currentDate <= lastDate) {
                 dates.push(new Date(currentDate));
                 currentDate.setDate(currentDate.getDate() + 1);
             }
-
             return dates;
         }
-
         function renderMatrix() {
             const thead = iconMatrix.querySelector('thead tr');
             const tbody = iconMatrix.querySelector('tbody');
-
             thead.innerHTML = '';
             tbody.innerHTML = '';
-
             const dateHeader = document.createElement('th');
             dateHeader.className = 'icon-header';
             dateHeader.innerHTML = '&nbsp;';
             thead.appendChild(dateHeader);
-
             dates.forEach(date => {
-                const td = document.createElement('td');
-                const dateKey = formatDateKey(date);
-                td.dataset.date = formatDateMD(date); // 追加
-
-                if (originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon)) {
-                    td.classList.add('committed');
-                }
-
-                if (workingMatrix[dateKey] && workingMatrix[dateKey].includes(icon.icon) &&
-                    !(originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon))) {
-                    td.classList.add('pending');
-                }
-
-                td.addEventListener('click', () => {
-                    // 既存のクリックイベント処理
-                });
-                tr.appendChild(td);
+                const th = document.createElement('th');
+                th.className = 'date-header';
+                th.textContent = formatDateMD(date);
+                th.dataset.date = formatDateKey(date);
+                thead.appendChild(th);
             });
-
-
             const filteredIcons = icons.filter(icon =>
                 icon.title.toLowerCase().includes(iconSearch.value.toLowerCase()) ||
                 icon.icon.toLowerCase().includes(iconSearch.value.toLowerCase())
             );
-
             filteredIcons.forEach(icon => {
                 const tr = document.createElement('tr');
                 const th = document.createElement('th');
@@ -376,10 +346,13 @@
                     th.innerHTML = `<span class="icon-emoji">${icon.icon}</span><span class="icon-title">${icon.title}</span>`;
                 }
                 tr.appendChild(th);
-
-                dates.forEach(date => {
+   dates.forEach(date => {
                     const td = document.createElement('td');
                     const dateKey = formatDateKey(date);
+                    const dateMD = formatDateMD(date);
+
+                    // 日付をセル内に直接表示
+                    td.textContent = dateMD;
 
                     if (originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon)) {
                         td.classList.add('committed');
@@ -412,25 +385,22 @@
                     });
                     tr.appendChild(td);
                 });
+
                 tbody.appendChild(tr);
             });
         }
-
         async function loadData() {
             const token = localStorage.getItem('githubToken');
             if (!token) {
                 showToast('GitHub Tokenが必要だ。', true);
                 return;
             }
-
             const iconsContent = await fetchGitHubFile('icons.csv', token);
             const iconData = parseCSV(iconsContent);
-
             icons = [...new Map(iconData.map(item => [item.icon, item])).values()];
             dates = generateAllDates(iconData);
             originalMatrix = {};
             workingMatrix = { ...originalMatrix };
-
             iconData.forEach(entry => {
                 if (entry.date && entry.icon) {
                     if (!originalMatrix[entry.date]) originalMatrix[entry.date] = [];
@@ -439,21 +409,17 @@
                     }
                 }
             });
-
             Object.keys(originalMatrix).forEach(dateKey => {
                 workingMatrix[dateKey] = [...originalMatrix[dateKey]];
             });
-
             renderMatrix();
         }
-
         saveButton.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
             if (!token) {
                 showToast('GitHub Tokenが必要だ。', true);
                 return;
             }
-
             try {
                 let csvContent = 'date,title,icon,url\n';
                 Object.entries(workingMatrix).forEach(([date, iconList]) => {
@@ -464,16 +430,13 @@
                         }
                     });
                 });
-
                 const repoOwner = 'gojiroma';
                 const repoName = 'diary';
                 const filePath = 'icons.csv';
                 const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
-
                 const fileResponse = await fetch(apiUrl, { headers: { 'Authorization': `token ${token}` } });
                 if (!fileResponse.ok) throw new Error('Failed to get file info');
                 const fileData = await fileResponse.json();
-
                 await fetch(apiUrl, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
@@ -483,7 +446,6 @@
                         sha: fileData.sha
                     })
                 });
-
                 originalMatrix = JSON.parse(JSON.stringify(workingMatrix));
                 showToast('保存した。');
                 renderMatrix();
@@ -492,7 +454,6 @@
                 showToast('保存に失敗だ。', true);
             }
         });
-
         iconSearch.addEventListener('input', renderMatrix);
         const addIconButton = document.getElementById('addIconButton');
         const addIconModal = document.getElementById('addIconModal');
@@ -501,39 +462,28 @@
         const newIconTitle = document.getElementById('newIconTitle');
         const newIcon = document.getElementById('newIcon');
         const newIconUrl = document.getElementById('newIconUrl');
-
-
         addIconButton.addEventListener('click', () => {
             newIconTitle.value = '';
             newIcon.value = '';
             newIconUrl.value = '';
             addIconModal.style.display = 'block';
         });
-
-
         cancelAddIcon.addEventListener('click', () => {
             addIconModal.style.display = 'none';
         });
-
-
         confirmAddIcon.addEventListener('click', () => {
             const title = newIconTitle.value.trim();
             const icon = newIcon.value.trim();
             const url = newIconUrl.value.trim();
-
-
             if (!title || !icon) {
                 showToast('タイトルとアイコンは必須だ。', true);
                 return;
             }
-
-
             icons.push({ title, icon, url });
             addIconModal.style.display = 'none';
             renderMatrix();
             showToast('アイコンを追加した。');
         });
-
         window.addEventListener('load', () => {
             if (!localStorage.getItem('githubToken')) {
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
@@ -543,8 +493,6 @@
             loadData();
         });
     </script>
-
-
 </body>
 
 </html>
