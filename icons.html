@@ -67,6 +67,27 @@
             background-color: #4d4d4d;
         }
 
+        .matrix-table td::after {
+            content: attr(data-date);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffe4da;
+            font-size: 0.6em;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .matrix-table td:hover::after {
+            display: flex;
+        }
+
         .icon-header {
             height: 60px;
             min-width: 60px;
@@ -320,12 +341,25 @@
             thead.appendChild(dateHeader);
 
             dates.forEach(date => {
-                const th = document.createElement('th');
-                th.className = 'date-header';
-                th.textContent = formatDateMD(date);
-                th.dataset.date = formatDateKey(date);
-                thead.appendChild(th);
+                const td = document.createElement('td');
+                const dateKey = formatDateKey(date);
+                td.dataset.date = formatDateMD(date); // 追加
+
+                if (originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon)) {
+                    td.classList.add('committed');
+                }
+
+                if (workingMatrix[dateKey] && workingMatrix[dateKey].includes(icon.icon) &&
+                    !(originalMatrix[dateKey] && originalMatrix[dateKey].includes(icon.icon))) {
+                    td.classList.add('pending');
+                }
+
+                td.addEventListener('click', () => {
+                    // 既存のクリックイベント処理
+                });
+                tr.appendChild(td);
             });
+
 
             const filteredIcons = icons.filter(icon =>
                 icon.title.toLowerCase().includes(iconSearch.value.toLowerCase()) ||
