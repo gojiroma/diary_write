@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="縦書き日記アプリ。偽日記と本日記の2ペイン対応。アイコン管理機能付き。GitHub連携で自動保存。">
+    <meta name="description" content="縦書き日記アプリ。偽日記と本日記の2ペイン対応。GitHub連携で自動保存。">
     <meta name="date" content="2026-02-27">
     <title>かくぞう</title>
     <link rel="icon" href="icon-write.png" type="image/png">
@@ -106,106 +106,6 @@
             text-orientation: upright;
         }
 
-        .icon-panel {
-            width: 200px;
-            height: 100%;
-            background-color: #1e1e1e;
-            border-radius: 20px;
-            padding: 15px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            overflow-y: auto;
-        }
-
-        .icon-checkboxes {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            max-height: 80%;
-            overflow-y: auto;
-        }
-
-        .icon-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .icon-checkbox input[type="checkbox"] {
-            margin: 0;
-        }
-
-        .icon-checkbox label {
-            font-size: 0.9em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .icon-emoji {
-            font-size: 1.2em;
-        }
-
-        .icon-image {
-            width: 16px;
-            height: 16px;
-            object-fit: contain;
-            filter: grayscale(100%);
-        }
-
-        .icon-search {
-            margin-bottom: 10px;
-        }
-
-        .icon-search input {
-            width: 100%;
-            padding: 5px;
-            background-color: #2d2d2d;
-            color: #e0e0e0;
-            border: none;
-            border-radius: 5px;
-            font-size: 0.9em;
-        }
-
-        .icon-search input:focus {
-            outline: none;
-        }
-
-        .icon-add {
-            margin-top: auto;
-        }
-
-        .icon-add input {
-            width: 100%;
-            padding: 5px;
-            background-color: #2d2d2d;
-            color: #e0e0e0;
-            border: none;
-            border-radius: 5px;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-
-        .icon-add button {
-            width: 100%;
-            padding: 5px;
-            background-color: #3d3d3d;
-            color: #e0e0e0;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-
-        .icon-add button:hover {
-            background-color: #4d4d4d;
-        }
-
         .toast {
             visibility: hidden;
             min-width: 250px;
@@ -267,7 +167,6 @@
             background-color: #4d4d4d;
         }
 
-
         @media (max-width: 600px) {
             .diary-boxes {
                 flex-direction: column;
@@ -289,12 +188,6 @@
                 writing-mode: horizontal-tb;
                 text-orientation: mixed;
             }
-
-            .icon-panel {
-                width: 100%;
-                height: auto;
-                max-height: 200px;
-            }
         }
     </style>
 </head>
@@ -315,23 +208,9 @@
                 <textarea id="realDiary" placeholder="本日記を入力..."></textarea>
                 <button class="copy-button" data-target="realDiary">copy text</button>
             </div>
-            <div class="icon-panel">
-                <h3 style="font-size: 1em; margin: 0 0 10px 0;">アイコン選択</h3>
-                <div class="icon-search">
-                    <input type="text" id="iconSearch" placeholder="アイコンを検索...">
-                </div>
-                <div class="icon-checkboxes" id="iconCheckboxes"></div>
-                <div class="icon-add">
-                    <input type="text" id="newIconTitle" placeholder="タイトル">
-                    <input type="text" id="newIcon" placeholder="アイコン（絵文字またはURL）">
-                    <input type="text" id="newIconUrl" placeholder="URL（省略可）">
-                    <button id="addIconButton">アイコンを追加</button>
-                </div>
-            </div>
         </div>
     </div>
     <div class="link-container">
-        <a href="/icons.html"    class="subtle-link" target="_blank">アイコンm</a>
         <a href="https://github.com/gojiroma/diary" class="subtle-link" target="_blank"
             rel="noopener noreferrer">日記のrepo</a>
         <a href="https://nikki.poet.blue" class="subtle-link" target="_blank" rel="noopener noreferrer">日記prod</a>
@@ -377,21 +256,12 @@
         const dateDisplay = document.getElementById('dateDisplay');
         const prevDayButton = document.getElementById('prevDay');
         const nextDayButton = document.getElementById('nextDay');
-        const iconSearch = document.getElementById('iconSearch');
-        const iconCheckboxes = document.getElementById('iconCheckboxes');
-        const newIconTitle = document.getElementById('newIconTitle');
-        const newIcon = document.getElementById('newIcon');
-        const newIconUrl = document.getElementById('newIconUrl');
-        const addIconButton = document.getElementById('addIconButton');
 
         let currentDate = new Date();
         let currentDateKeyMd = formatDateKey(currentDate, true);
         let currentDateKeyCsv = formatDateKey(currentDate, false);
-        let selectedIcons = new Set();
         let cachedDiaryContent = null;
         let cachedFakeContent = null;
-        let cachedIconsContent = null;
-        let cachedIcons = [];
 
         dateDisplay.textContent = formatJapaneseDate(currentDate);
 
@@ -408,68 +278,12 @@
             }
         }
 
-        function parseCSV(csv) {
-            if (!csv) return [];
-            const lines = csv.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
-            const icons = lines.slice(1).map(line => {
-                const values = line.split(',');
-                return headers.reduce((obj, header, i) => {
-                    obj[header] = values[i] ? values[i].trim() : '';
-                    return obj;
-                }, {});
-            }).filter(row => row.icon);
-
-            // 重複除去（iconプロパティで判定）
-            const uniqueIcons = [];
-            const seenIcons = new Set();
-            icons.forEach(icon => {
-                if (!seenIcons.has(icon.icon)) {
-                    seenIcons.add(icon.icon);
-                    uniqueIcons.push(icon);
-                }
-            });
-
-            return uniqueIcons;
-        }
-
         function extractEntry(content, dateKeyMd, dateKeyCsv) {
             if (!content) return null;
             const datePattern = dateKeyMd + '|' + dateKeyCsv.replace(/\//g, '\\/');
             const entryRegex = new RegExp(`date:\\s*(${datePattern})[\\s\\S]*?content:\\s*\\|([\\s\\S]*?)(?=---|\\n\\s*date:|$)`, 'i');
             const match = content.match(entryRegex);
             return match ? match[2].trim().replace(/^\s{2}/gm, '') : null;
-        }
-        function renderIconCheckboxes(icons, searchTerm = '') {
-            iconCheckboxes.innerHTML = '';
-
-            // 選択済みアイコンを先頭に表示
-            const selected = icons.filter(icon => selectedIcons.has(icon.icon));
-            const unselected = icons.filter(icon => !selectedIcons.has(icon.icon));
-
-            // 検索フィルタ
-            const filteredIcons = [...selected, ...unselected].filter(icon =>
-                icon.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                icon.icon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (icon.url && icon.url.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-
-            filteredIcons.forEach(icon => {
-                const checkbox = document.createElement('div');
-                checkbox.className = 'icon-checkbox';
-                const isImageIcon = icon.icon.startsWith('http');
-                checkbox.innerHTML = `
-            <input type="checkbox" id="icon-${icon.icon}" ${selectedIcons.has(icon.icon) ? 'checked' : ''}>
-            <label for="icon-${icon.icon}">
-                ${isImageIcon ? `<img src="${icon.icon}" class="icon-image" alt="${icon.title}">` : `<span class="icon-emoji">${icon.icon}</span>`}
-                <span>${icon.title}</span>
-            </label>
-        `;
-                checkbox.querySelector('input').addEventListener('change', (e) => {
-                    e.target.checked ? selectedIcons.add(icon.icon) : selectedIcons.delete(icon.icon);
-                });
-                iconCheckboxes.appendChild(checkbox);
-            });
         }
 
         async function loadEntriesForDate(date) {
@@ -479,13 +293,11 @@
             if (!token) return;
 
             try {
-                if (!cachedDiaryContent || !cachedFakeContent || !cachedIconsContent) {
-                    [cachedDiaryContent, cachedFakeContent, cachedIconsContent] = await Promise.all([
+                if (!cachedDiaryContent || !cachedFakeContent) {
+                    [cachedDiaryContent, cachedFakeContent] = await Promise.all([
                         fetchGitHubFile('entry.md', token),
-                        fetchGitHubFile('fake.md', token),
-                        fetchGitHubFile('icons.csv', token)
+                        fetchGitHubFile('fake.md', token)
                     ]);
-                    cachedIcons = parseCSV(cachedIconsContent);
                 }
 
                 const diaryEntry = extractEntry(cachedDiaryContent, dateKeyMd, dateKeyCsv);
@@ -493,11 +305,6 @@
 
                 realDiary.value = diaryEntry || '';
                 fakeDiary.value = fakeEntry || '';
-
-                selectedIcons.clear();
-                cachedIcons.filter(icon => icon.date === dateKeyCsv)
-                    .forEach(icon => selectedIcons.add(icon.icon));
-                renderIconCheckboxes(cachedIcons, iconSearch.value);
             } catch (error) {
                 console.error('Error loading entries:', error);
                 showToast('エントリの読み込みに失敗しました。', true);
@@ -520,7 +327,7 @@
             loadEntriesForDate(currentDate);
         });
 
-        async function updateMultipleFiles(token, dateKeyMd, dateKeyCsv, realContent, fakeContent, iconsContent) {
+        async function updateMultipleFiles(token, dateKeyMd, dateKeyCsv, realContent, fakeContent) {
             const repoOwner = 'gojiroma';
             const repoName = 'diary';
             const branch = 'main';
@@ -544,8 +351,7 @@
                         base_tree: latestTreeSha,
                         tree: [
                             { path: 'entry.md', mode: '100644', type: 'blob', content: realContent },
-                            { path: 'fake.md', mode: '100644', type: 'blob', content: fakeContent },
-                            { path: 'icons.csv', mode: '100644', type: 'blob', content: iconsContent }
+                            { path: 'fake.md', mode: '100644', type: 'blob', content: fakeContent }
                         ]
                     })
                 });
@@ -570,50 +376,31 @@
 
                 cachedDiaryContent = realContent;
                 cachedFakeContent = fakeContent;
-                cachedIconsContent = iconsContent;
-                cachedIcons = parseCSV(iconsContent);
 
                 return true;
             } catch (error) {
                 console.error('Error updating files:', error);
-                showToast('更新に失敗だぞ。', true);
+                showToast('更新に失敗しました。', true);
                 return false;
             }
         }
 
-        addIconButton.addEventListener('click', () => {
-            const title = newIconTitle.value.trim();
-            const icon = newIcon.value.trim();
-            const url = newIconUrl.value.trim();
-            if (title && icon) {
-                cachedIcons.push({ title, icon, url });
-                newIconTitle.value = '';
-                newIcon.value = '';
-                newIconUrl.value = '';
-                renderIconCheckboxes(cachedIcons);
-                showToast('新規アイコンを追加してやったぞ。');
-            } else {
-                showToast('タイトルとアイコンはどうしたんだ。', true);
-            }
-        });
-
         dateDisplay.addEventListener('click', async () => {
             const token = localStorage.getItem('githubToken');
             if (!token) {
-                const userToken = prompt('GitHub Personal Access Tokenを入れてくれよな:');
+                const userToken = prompt('GitHub Personal Access Tokenを入れてください:');
                 if (!userToken) return;
                 localStorage.setItem('githubToken', userToken);
             }
 
-            if (!realDiary.value.trim() && !fakeDiary.value.trim() && selectedIcons.size === 0) {
-                showToast('本文かアイコンが空だぞ。', true);
+            if (!realDiary.value.trim() && !fakeDiary.value.trim()) {
+                showToast('本文が空です。', true);
                 return;
             }
 
             try {
                 let newEntryContent = cachedDiaryContent || '';
                 let newFakeContent = cachedFakeContent || '';
-                let newIconsContent = cachedIconsContent || 'date,title,icon,url\n';
 
                 const entryRegexMd = new RegExp(`date:\\s*${currentDateKeyMd}[\\s\\S]*?(?=---|$)`);
                 const entryRegexCsv = new RegExp(`date:\\s*${currentDateKeyCsv.replace(/\//g, '\\/')}[\\s\\S]*?(?=---|$)`);
@@ -638,33 +425,14 @@
                     }
                 }
 
-                const iconsToAdd = Array.from(selectedIcons).map(selectedIcon => {
-                    const existingIcon = cachedIcons.find(i => i.icon === selectedIcon);
-                    return {
-                        date: currentDateKeyCsv,
-                        title: existingIcon?.title || selectedIcon,
-                        icon: selectedIcon,
-                        url: existingIcon?.url || ''
-                    };
-                });
-
-                const lines = newIconsContent.split('\n');
-                const header = lines[0];
-                const newLines = lines.filter(line => {
-                    const values = line.split(',');
-                    return values[0] !== currentDateKeyMd && values[0] !== currentDateKeyCsv && line !== header;
-                });
-
-                newIconsContent = [header, ...iconsToAdd.map(icon => `${icon.date},${icon.title},${icon.icon},${icon.url}`), ...newLines].join('\n');
-
-                const success = await updateMultipleFiles(token, currentDateKeyMd, currentDateKeyCsv, newEntryContent, newFakeContent, newIconsContent);
+                const success = await updateMultipleFiles(token, currentDateKeyMd, currentDateKeyCsv, newEntryContent, newFakeContent);
                 if (success) {
-                    showToast('pushしといたぞ。');
+                    showToast('保存しました。');
                     loadEntriesForDate(currentDate);
                 }
             } catch (error) {
                 console.error('Error sending update:', error);
-                showToast('送信に失敗だ。', true);
+                showToast('送信に失敗しました。', true);
             }
         });
 
@@ -672,27 +440,26 @@
             if (!localStorage.getItem('githubToken')) {
                 const userToken = prompt('GitHub Personal Access Tokenを入力してください:');
                 if (userToken) localStorage.setItem('githubToken', userToken);
-                else { showToast('GitHub Tokenが必要だぜ。', true); return; }
+                else { showToast('GitHub Tokenが必要です。', true); return; }
             }
             loadEntriesForDate(currentDate);
         });
+
         // コピーボタンのクリックイベント
-            document.querySelectorAll('.copy-button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const targetId = button.getAttribute('data-target');
-                    const textarea = document.getElementById(targetId);
-                    if (textarea.value.trim()) {
-                        textarea.select();
-                        document.execCommand('copy');
-                        showToast('テキストをコピーしたぞ。');
-                    } else {
-                        showToast('コピーするテキストがないぞ。', true);
-                    }
-                });
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const textarea = document.getElementById(targetId);
+                if (textarea.value.trim()) {
+                    textarea.select();
+                    document.execCommand('copy');
+                    showToast('テキストをコピーしました。');
+                } else {
+                    showToast('コピーするテキストがありません。', true);
+                }
             });
-
+        });
     </script>
-
 </body>
 
 </html>
